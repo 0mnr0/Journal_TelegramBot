@@ -216,18 +216,21 @@ def printHelp(message):
 */help*, */помощь* - Список комманд
 
 ----
-*/sched*, */shed*, */пары*, */расписание* - Показать расписание 
+*/sched*, */shed*, */пары*, */расписание*, *пары*, *!пары* - Показать расписание 
 
 *Поддерживает параметры*
-/? <завтра, послезавтра, вчера, 2024-01-01, сегодня>
+/? <завтра, послезавтра, вчера, 2024-01-01, сегодня, +X, -X >
 Значение по умолчанию: сегодня    
+
+Команды: *!пары* и *!расписание* можно использовать в контексте. Пример:
+*Какие завтра !пары*
 ----
 
 Помощь по подключению бота для групп:
 Подключите бота к группе, выдайте ему права администратора для отправки сообщений в чат (по умолчанию бот не может это делать если он подключен к групповому  чату)
 Авторизируйте свой аккаунт в личных сообщениях. В группе пропишите комманду /auth и бот отправит кнопку с ссылкой. Нажмите на эту кнопку и вам придёт запрос на подтверждение от бота, подтвердите привязку и бот в группе сообщит об успешной привязке аккаунта! 
 """
-    finalText = finalText.replace("-", "\\-").replace(".", "\\.").replace("!", "\\!").replace("(", "\\(").replace(")", "\\)").replace("<", "\\<").replace(">", "\\>")
+    finalText = finalText.replace("-", "\\-").replace(".", "\\.").replace("!", "\\!").replace("(", "\\(").replace(")", "\\)").replace("<", "\\<").replace(">", "\\>").replace("}", "\\}").replace("{", "\\{").replace("+", "\\+")
     bot.reply_to(message, finalText, parse_mode='MarkdownV2')
 
 
@@ -258,13 +261,16 @@ def ReAuthInSystem(message):
 
 
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed'])
-def fetchDate(message, Relaunch=False):
+def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
     print('shedulecall: ',message)
     if IsUserRegistered(uid):
         global showingText
         global operationDay
-        sended_msg = send_message(uid, "Секунду, ищем расписание...")
+        sended_msg = Sended
+        if Relaunch == False:
+            sended_msg = send_message(uid, "Секунду, ищем расписание...")
+
         uiInfo = ReadBotJson(uid)
         expiration_timestamp = uiInfo.get('jwtExpiries')
         lastJwt = uiInfo.get('jwtToken')
@@ -325,14 +331,16 @@ def fetchDate(message, Relaunch=False):
 
 
                 print('Trying to edit msg')
-                bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                if sended_msg != None:
+                    try: bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                    except: pass
                 bot.send_message(message.chat.id, text="Пары на `"+operationDay+"`:\n\n"+finalText, parse_mode='MarkdownV2')
                 print('Edited!')
             else:
                 ReAuthInSystem(message)
                 if not Relaunch:
                     bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
-                    fetchDate(message, True)
+                    fetchDate(message, True, sended_msg)
                 else:
                     bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
         else:
@@ -340,7 +348,7 @@ def fetchDate(message, Relaunch=False):
 
             if not Relaunch:
                 bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
-                fetchDate(message, True)
+                fetchDate(message, True, sended_msg)
             else:
                 bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
 
@@ -438,7 +446,7 @@ def echo_message(message):
                 userInfo['chat_type'] = message.chat.type
             tkn = responseJson.get('access_token')
 
-            if True:
+            try:
                 fullUserInfo = get("https://msapi.top-academy.ru/api/v2/settings/user-info", tkn)
                 SaveJSON(uid + '/userInfo.json', fullUserInfo.json())
                 userName = fullUserInfo.json()
@@ -446,11 +454,13 @@ def echo_message(message):
                     userName = "{скрыто}"
                 else: userName = userName.get('full_name')
 
-                send_message(uid,
-                    "Спасибо за авторизацию в боте, " + userName + '!\n\nТеперь у вас есть возможность запрашивать расписание для вашего Journal. :)')
-            # except Exception as e:
-            #    print("Error", e)
-            #    send_message(uid, "Мы вошли в ваш аккаунт, но при получении допонительных данных произошла ошибка. Вы можете попробовать ещё раз или игнорировать это.\n(api/v2/settings/u-i: get() error)")
+                SetWaitForLoginData(uid, False)
+                send_message(uid, "Спасибо за авторизацию в боте, " + userName + '!\n\nТеперь у вас есть возможность запрашивать расписание для вашего Journal. :)')
+
+            except Exception as e:
+                SetWaitForLoginData(uid, False)
+                print("Error", e)
+                send_message(uid, "Мы вошли в ваш аккаунт, но при получении допонительных данных произошла ошибка. Вы можете попробовать ещё раз или игнорировать это.\n(api/v2/settings/u-i: get() error)")
 
             SaveJSON(uid + '/botInfo.json', userInfo)
 
@@ -464,7 +474,7 @@ def echo_message(message):
 
     if IsUserRegistered(uid) and not ui.get('WaitForAuth'):
         if True:
-            if 'пары' in message.text.lower() or 'gfhs' in message.text.lower() or 'расписание' in message.text.lower():
+            if '!пары' in message.text.lower() or '!gfhs' in message.text.lower() or '!расписание' in message.text.lower():
                 fetchDate(message)
 
 
