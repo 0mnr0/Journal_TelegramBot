@@ -32,10 +32,13 @@ def IsUserExists(userId):
     return os.path.exists(userFolderPath + '/' + userId)
 
 def ReadBotJson(userId):
-    userId = str(userId)
-    pathToJson = userFolderPath + '/' + userId + '/botInfo.json'
-    file = open(pathToJson, 'r', encoding='utf-8')
-    return json.loads(file.read())
+    if IsUserExists(userId):
+        userId = str(userId)
+        pathToJson = userFolderPath + '/' + userId + '/botInfo.json'
+        file = open(pathToJson, 'r', encoding='utf-8')
+        return json.loads(file.read())
+    else:
+        return None
 
 
 def ReadJSON(pathToJson):
@@ -101,8 +104,8 @@ def send_welcome(message):
             auth_button = types.InlineKeyboardButton(text="Авторизоваться", callback_data=f"auth:{message.chat.id}")
             keyboard.add(auth_button)
             bot.send_message(message.chat.id,
-                             text="Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте.",
-                             reply_markup=keyboard)
+                text="Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте.",
+                reply_markup=keyboard)
         else:
 
 
@@ -403,7 +406,12 @@ def post(url, js, authToken='null'):
 def echo_message(message):
     uid = str(message.chat.id)
     text = message.text
-    if not IsUserRegistered(uid):
+    ui = ReadBotJson(uid)
+
+    if not IsUserRegistered(uid) and ui is not None and ui.get('WaitForAuth') == False:
+        send_welcome(message)
+        return
+    if ui is None:
         send_welcome(message)
         return
 
