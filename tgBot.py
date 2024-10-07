@@ -1,7 +1,5 @@
 from threading import *
 
-from yt_dlp.extractor.threeqsdn import ThreeQSDNIE
-
 from dateProcessor import *
 import logging
 import json
