@@ -17,8 +17,6 @@ def getTextOperation(txt):
     first_part, second_part = txt.split(' ', 1)
     command = (second_part.replace(' ','')) [0]
     action = (second_part.replace(' ',''))[1::]
-    print("command of getText:",command)
-    print("action of getText:",action)
     if command == '+' or command == '-':
         action = action.replace('+','').replace('-','')
         return command, action
