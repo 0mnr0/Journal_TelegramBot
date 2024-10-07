@@ -1,3 +1,4 @@
+import logging
 import json
 import os
 import time
@@ -11,6 +12,9 @@ userFolderPath = 'userInfo'
 
 API_TOKEN = open('tkn.ini', 'r').read()
 bot = telebot.TeleBot(API_TOKEN)
+logger = logging.getLogger('TeleBot').setLevel(logging.INFO)
+
+
 
 
 def CreateFolderIfNotExists(path):
@@ -106,10 +110,13 @@ def send_welcome(message):
             keyboard = types.InlineKeyboardMarkup()
             auth_button = types.InlineKeyboardButton(text="Авторизовать группу", callback_data=f"groupAuth:{message.chat.id}")
             keyboard.add(auth_button)
-            bot.send_message(message.chat.id, text="Авторизация не доступна в группе. Используйте кнопку ниже для привязки аккаунту к группе:", reply_markup=keyboard)
+            send_message(message.chat.id, "*Для нормальной работы бота выдайте ему роль администраотра*\n*Для того чтобы кнопка работала напишите ему в личные сообщения*\n\nАвторизация не доступна в группе. Используйте кнопку ниже для привязки аккаунту к группе:", reply_markup=keyboard)
 
 
-
+# Функция для проверки прав администратора
+def is_admin(chat_id):
+    member = bot.get_chat_member(chat_id, bot.get_me().id)
+    return member.status in ['administrator', 'creator']
 
 @bot.message_handler(commands=['clearauth'])
 def clearAuth(message):
@@ -185,30 +192,35 @@ def groupauth_callback(call):
         else:
             send_message(whoClicked, "Ваши данные не зарегистрированы. Пожалуйста, сперва сначала пройдите процесс авторизации /auth")
     else:
-        send_message(whoClicked, "Чтобы авторизоваться в группе, необходимо зарегистрироваться ваш Telegram аккаунт в боте.\n\nДля этого нужно использовать комманду /auth")
-
+        try:
+            send_message(whoClicked, "Чтобы авторизоваться в группе, необходимо зарегистрироваться ваш Telegram аккаунт в боте.\n\nДля этого нужно использовать комманду /auth")
+        except:
+            pass
 
 
 @bot.message_handler(commands=['пары', 'расписание'])
 def fetchDate(message):
     uid = str(message.chat.id)
+    print('shedulecall: ',message)
     if IsUserRegistered(uid):
         global showingText
         global operationDay
-        send_message(uid, "Секунду, ищем расписание...")
+        sended_msg = send_message(uid, "Секунду, ищем расписание...")
         uiInfo = ReadBotJson(uid)
         expiration_timestamp = uiInfo.get('jwtExpiries')
         lastJwt = uiInfo.get('jwtToken')
         basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
-        operationDay = datetime.today()+timedelta(days=2)
+        operationDay = datetime.today()
         showingText = "сегодня"
 
-        if "завтра" in message.text.lower():
-            showingText = "завтра"
-            operationDay = operationDay+timedelta(days=1)
+
         if "послезавтра" in message.text.lower():
             showingText = "послезавтра"
             operationDay = operationDay+timedelta(days=2)
+        elif "завтра" in message.text.lower():
+            showingText = "завтра"
+            operationDay = operationDay + timedelta(days=1)
+
         if "вчера" in message.text.lower():
             showingText = "вчера"
             operationDay = operationDay-timedelta(days=1)
@@ -232,17 +244,21 @@ def fetchDate(message):
             # Example of url by finding a day:
             #https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
 
-
+            print('fetching:', basicUrl+operationDay)
+            print('jwt:', lastJwt)
             fetchResult = get(basicUrl+operationDay, lastJwt)
             jsonResult = fetchResult.json()
+            print('endedFetch:', lastJwt)
 
             finalText = ""
             for lesson in jsonResult:
-                finalText += '```*Пара'+str(lesson.get('lesson'))+':*\n'+ lesson.get('subject_name')+"\n"
+                finalText += '```Пара'+str(lesson.get('lesson'))+':\n'+ lesson.get('subject_name')+"\n"
                 finalText += lesson.get('started_at')+" - "+lesson.get('finished_at')+" ("+lesson.get('room_name')+")\n"
                 finalText += "```"
-
-            send_message(message.chat.id, "Пары на `"+operationDay+"`:\n\n"+finalText)
+            print('Trying to edit msg')
+            bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+            bot.send_message(message.chat.id, text="Пары на `"+operationDay+"`:\n\n"+finalText, parse_mode='MarkdownV2')
+            print('Edited!')
         else:
             print(expiration_timestamp)
             print(lastJwt)
@@ -311,6 +327,8 @@ def post(url, js, authToken='null'):
 @bot.message_handler(func=lambda message: True)
 def echo_message(message):
     uid = str(message.chat.id)
+    print(message)
+
     text = message.text
     ui = ReadBotJson(uid)
     if ui.get('WaitForAuth') and not isMessageFromGroup(message):
@@ -358,12 +376,16 @@ def echo_message(message):
                 send_message(uid, "Что-то пошло не так!")
         ui['WaitForAuth'] = False
 
-    print(None)
+
+@bot.callback_query_handler(func=lambda call: call.data == "ok_pressed")
+def callback_ok(call):
+    # Показываем попап с текстом при нажатии на кнопку
+    bot.answer_callback_query(callback_query_id=call.id, text="Пример текста", show_alert=True)
 
 
 def send_message(userId, msg, reply_markup=None):
     msg = msg.replace("-", "\\-").replace(".", "\\.").replace("!", "\\!").replace("(", "\\(").replace(")", "\\)")
-    bot.send_message(userId, msg, parse_mode='MarkdownV2', reply_markup=reply_markup)
+    return bot.send_message(userId, msg, parse_mode='MarkdownV2', reply_markup=reply_markup)
 
 
 bot.infinity_polling()
