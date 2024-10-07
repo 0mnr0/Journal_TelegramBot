@@ -1,3 +1,6 @@
+from dulwich.porcelain import fetch
+
+from dateProcessor import *
 import logging
 import json
 import os
@@ -198,8 +201,61 @@ def groupauth_callback(call):
             pass
 
 
-@bot.message_handler(commands=['пары', 'расписание'])
-def fetchDate(message):
+@bot.message_handler(commands=['help', 'помощь'])
+def printHelp(message):
+    finalText = """
+    Список комманд: 
+    
+*/start* - Начтаь общение с ботом
+*/auth* - Запуск процесса авторизации
+*/cancelauth* - Отмена ожидания авторизации
+*/clearauth* - Очистка данных авторизации
+*/help*, */помощь* - Список комманд
+
+----
+*/sched*, */shed*, */пары*, */расписание* - Показать расписание 
+
+*Поддерживает параметры*
+/? <завтра, послезавтра, вчера, 2024-01-01, сегодня>
+Значение по умолчанию: сегодня    
+----
+
+Помощь по подключению бота для групп:
+Подключите бота к группе, выдайте ему права администратора для отправки сообщений в чат (по умолчанию бот не может это делать если он подключен к групповому  чату)
+Авторизируйте свой аккаунт в личных сообщениях. В группе пропишите комманду /auth и бот отправит кнопку с ссылкой. Нажмите на эту кнопку и вам придёт запрос на подтверждение от бота, подтвердите привязку и бот в группе сообщит об успешной привязке аккаунта! 
+"""
+    finalText = finalText.replace("-", "\\-").replace(".", "\\.").replace("!", "\\!").replace("(", "\\(").replace(")", "\\)").replace("<", "\\<").replace(">", "\\>")
+    bot.reply_to(message, finalText, parse_mode='MarkdownV2')
+
+
+def ReAuthInSystem(message):
+    uid = str(message.chat.id)
+    if IsUserRegistered(uid):
+        authData = {
+            "application_key": '6a56a5df2667e65aab73ce76d1dd737f7d1faef9c52e8b8c55ac75f565d8e8a6',
+            "username": ReadBotJson(uid).get('login'),
+            "password": ReadBotJson(uid).get('password'),
+        }
+        auth = post('https://msapi.top-academy.ru/api/v2/auth/login', authData)
+        if auth.status_code == 200:
+            responseJson = auth.json()
+            tkn = responseJson.get('access_token')
+            userInfo = ReadJSON(uid + '/botInfo.json')
+            userInfo['jwtToken'] = tkn
+            userInfo['jwtExpiries'] = responseJson.get('expires_in_access')
+            if message.chat.type != 'private':
+                userInfo['chat_type'] = message.chat.type
+            SaveJSON(uid + '/botInfo.json', userInfo)
+            return tkn
+        else:
+            return auth.status_code
+    else:
+        bot.reply_to(message, "Для начала привяжите ваши данные в боте: /auth")
+        return None
+
+
+@bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed'])
+def fetchDate(message, Relaunch=False):
     uid = str(message.chat.id)
     print('shedulecall: ',message)
     if IsUserRegistered(uid):
@@ -213,6 +269,22 @@ def fetchDate(message):
         operationDay = datetime.today()
         showingText = "сегодня"
 
+        if strClear(message.text).isdigit():
+            try:
+                maybeItsADay = clearDate(message.text)
+                convertedDate = parse_date(maybeItsADay)
+                operationDay = convertedDate
+                showingText = convertedDate
+            except:
+                operationDay = datetime.today()
+                showingText = "сегодня"
+
+        if isItPlusOperation(message.text):
+            operation, dayNum = getTextOperation(message.text)
+            if operation == "+":
+                operationDay = datetime.today() + timedelta(days=int(dayNum))
+            elif operation == "-":
+                operationDay = datetime.today() - timedelta(days=int(dayNum))
 
         if "послезавтра" in message.text.lower():
             showingText = "послезавтра"
@@ -220,23 +292,16 @@ def fetchDate(message):
         elif "завтра" in message.text.lower():
             showingText = "завтра"
             operationDay = operationDay + timedelta(days=1)
-
         if "вчера" in message.text.lower():
             showingText = "вчера"
             operationDay = operationDay-timedelta(days=1)
-        if "-" in message.text:
-            showingText = message.text
-            operationDay = datetime.strptime(message.text, "%Y-%m-%d")
-            print("Detected \"-\" in:", showingText)
 
 
+        if type(operationDay) != str:
+            operationDay = operationDay.strftime('%Y-%m-%d')
 
 
-
-
-
-        operationDay = operationDay.strftime('%Y-%m-%d')
-        if expiration_timestamp == None:
+        if expiration_timestamp is None:
             expiration_timestamp = time.time()+10
 
         if time.time() < expiration_timestamp:
@@ -244,27 +309,37 @@ def fetchDate(message):
             # Example of url by finding a day:
             #https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
 
-            print('fetching:', basicUrl+operationDay)
-            print('jwt:', lastJwt)
+
             fetchResult = get(basicUrl+operationDay, lastJwt)
-            jsonResult = fetchResult.json()
-            print('endedFetch:', lastJwt)
+            if fetchResult.status_code == 200:
+                jsonResult = fetchResult.json()
 
-            finalText = ""
-            for lesson in jsonResult:
-                finalText += '```Пара'+str(lesson.get('lesson'))+':\n'+ lesson.get('subject_name')+"\n"
-                finalText += lesson.get('started_at')+" - "+lesson.get('finished_at')+" ("+lesson.get('room_name')+")\n"
-                finalText += "```"
-            print('Trying to edit msg')
-            bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
-            bot.send_message(message.chat.id, text="Пары на `"+operationDay+"`:\n\n"+finalText, parse_mode='MarkdownV2')
-            print('Edited!')
+                finalText = ""
+                for lesson in jsonResult:
+                    finalText += '```Пара'+str(lesson.get('lesson'))+':\n'+ lesson.get('subject_name')+"\n"
+                    finalText += lesson.get('started_at')+" - "+lesson.get('finished_at')+" ("+lesson.get('room_name')+")\n"
+                    finalText += "```"
+
+
+                print('Trying to edit msg')
+                bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                bot.send_message(message.chat.id, text="Пары на `"+operationDay+"`:\n\n"+finalText, parse_mode='MarkdownV2')
+                print('Edited!')
+            else:
+                ReAuthInSystem(message)
+                if not Relaunch:
+                    bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                    fetchDate(message, True)
+                else:
+                    bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
         else:
-            print(expiration_timestamp)
-            print(lastJwt)
-            print(time.time() < expiration_timestamp)
+            ReAuthInSystem(message)
 
-
+            if not Relaunch:
+                bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                fetchDate(message, True)
+            else:
+                bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
 
 
 
@@ -327,11 +402,14 @@ def post(url, js, authToken='null'):
 @bot.message_handler(func=lambda message: True)
 def echo_message(message):
     uid = str(message.chat.id)
-    print(message)
-
     text = message.text
+    if not IsUserRegistered(uid):
+        send_welcome(message)
+        return
+
     ui = ReadBotJson(uid)
     if ui.get('WaitForAuth') and not isMessageFromGroup(message):
+
         login, pasw = text.replace(' ', '').split(',')
         send_message(uid,
                      "Мы выполним вход в ваш аккаунт для проверки пароля. Мы уведомим вас сразу после того как нам придёт ответ от Journal")
@@ -375,6 +453,12 @@ def echo_message(message):
             else:
                 send_message(uid, "Что-то пошло не так!")
         ui['WaitForAuth'] = False
+
+    if IsUserRegistered(uid) and not ui.get('WaitForAuth'):
+        if True:
+            if 'пары' in message.text.lower() or 'gfhs' in message.text.lower() or 'расписание' in message.text.lower():
+                fetchDate(message)
+
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "ok_pressed")
