@@ -1,4 +1,6 @@
-from dulwich.porcelain import fetch
+from threading import *
+
+from yt_dlp.extractor.threeqsdn import ThreeQSDNIE
 
 from dateProcessor import *
 import logging
@@ -18,6 +20,38 @@ bot = telebot.TeleBot(API_TOKEN)
 logger = logging.getLogger('TeleBot').setLevel(logging.INFO)
 
 
+moscowTime = datetime.now()+timedelta(hours=1)
+
+def reInitTime():
+    global moscowTime
+    moscowTime = datetime.now()+timedelta(hours=1)
+
+
+
+
+def backgroundSend():
+    reInitTime()
+    mscTime = moscowTime.strftime("%H_%M")
+
+    print('mscTime:', mscTime)
+
+    if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
+        for user in os.listdir(userFolderPath+'/notifyList/'+mscTime):
+            uid = user
+            #Auth and send notify
+            tkn = EaseAuth(uid)
+            if type(tkn) == str:
+                sheduleNotifySender(uid, tkn)
+
+
+    time.sleep(10)
+    backgroundSend()
+
+notifier = Thread(target=backgroundSend)
+notifier.start()
+
+
+
 
 
 def CreateFolderIfNotExists(path):
@@ -26,6 +60,7 @@ def CreateFolderIfNotExists(path):
 
 
 CreateFolderIfNotExists(userFolderPath)
+CreateFolderIfNotExists(userFolderPath+'/notifyList')
 
 def IsUserExists(userId):
     userId = str(userId)
@@ -65,6 +100,12 @@ def SetWaitForLoginData(userId, state):
     userId = str(userId)
     reg = ReadBotJson(userId)
     reg['WaitForAuth'] = state
+    SaveJSON(userId + '/botInfo.json', reg)
+
+def SetWaitForNotify(userId, state):
+    userId = str(userId)
+    reg = ReadBotJson(userId)
+    reg['notifySetup'] = state
     SaveJSON(userId + '/botInfo.json', reg)
 
 def dictToJson(d):
@@ -234,6 +275,30 @@ def printHelp(message):
     bot.reply_to(message, finalText, parse_mode='MarkdownV2')
 
 
+
+
+def EaseAuth(uid):
+    if IsUserRegistered(uid):
+        authData = {
+            "application_key": '6a56a5df2667e65aab73ce76d1dd737f7d1faef9c52e8b8c55ac75f565d8e8a6',
+            "username": ReadBotJson(uid).get('login'),
+            "password": ReadBotJson(uid).get('password'),
+        }
+        auth = post('https://msapi.top-academy.ru/api/v2/auth/login', authData)
+        if auth.status_code == 200:
+            responseJson = auth.json()
+            tkn = responseJson.get('access_token')
+            userInfo = ReadJSON(uid + '/botInfo.json')
+            userInfo['jwtToken'] = tkn
+            userInfo['jwtExpiries'] = responseJson.get('expires_in_access')
+            SaveJSON(uid + '/botInfo.json', userInfo)
+            return tkn
+        else:
+            return False
+    else:
+        return None
+
+
 def ReAuthInSystem(message):
     uid = str(message.chat.id)
     if IsUserRegistered(uid):
@@ -260,6 +325,40 @@ def ReAuthInSystem(message):
         return None
 
 
+@bot.message_handler(commands=['notifyme'])
+def notifier(message):
+    uid = str(message.chat.id)
+
+    bot.send_message(uid, "Вы настраиваете уведомления\. Отправьте время в формате часы:минуты в формате МСК времени\.\n\nПример сообщения: ```10:00``` или ```06\.30```", parse_mode='MarkdownV2')
+    SetWaitForNotify(uid, True)
+
+
+def sheduleNotifySender(uid, lastJwt):
+    if IsUserRegistered(uid):
+
+
+        basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
+        date = datetime.today().strftime('%Y-%m-%d')
+        print('silentDay:', date)
+        # https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
+
+        fetchResult = get(basicUrl + date, lastJwt)
+        if fetchResult.status_code == 200:
+            jsonResult = fetchResult.json()
+
+            finalText = ""
+            for lesson in jsonResult:
+                finalText += '```Пара' + str(lesson.get('lesson')) + ':\n' + lesson.get('subject_name') + "\n"
+                finalText += lesson.get('started_at') + " - " + lesson.get('finished_at') + " (" + lesson.get(
+                    'room_name') + ")\n"
+                finalText += "```"
+
+            print('Trying to edit msg')
+            bot.send_message(uid, text="*Notifier*\nПары на `" + date + "`:\n\n" + finalText,
+                             parse_mode='MarkdownV2')
+            print('Edited!')
+
+
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed'])
 def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
@@ -269,7 +368,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
         global operationDay
         sended_msg = Sended
         if Relaunch == False:
-            sended_msg = send_message(uid, "Секунду, ищем расписание...")
+            sended_msg = send_message(uid, "Секунду, ищем расписание...", disable_notification=True)
 
         uiInfo = ReadBotJson(uid)
         expiration_timestamp = uiInfo.get('jwtExpiries')
@@ -424,7 +523,20 @@ def echo_message(message):
         return
 
     ui = ReadBotJson(uid)
-    if ui.get('WaitForAuth') and not isMessageFromGroup(message):
+
+    if ui.get('notifySetup'):
+        SetWaitForNotify(uid, False)
+        userTime = text.replace(' ','')
+        isTimeNormal = is_valid_time(userTime)
+        if isTimeNormal:
+            send_message(uid, "Уведомления успешно активированы. Время уведомлений: " + userTime)
+            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + isTimeNormal)
+            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + isTimeNormal + '/'+uid)
+        else:
+            send_message(uid, "Время уведомлений введено некорректно. Пожалуйста, выполните комманду /notifyme снова и введите время в формате HH:MM")
+
+
+    elif ui.get('WaitForAuth') and not isMessageFromGroup(message):
 
         login, pasw = text.replace(' ', '').split(',')
         send_message(uid,
@@ -485,9 +597,9 @@ def callback_ok(call):
     bot.answer_callback_query(callback_query_id=call.id, text="Пример текста", show_alert=True)
 
 
-def send_message(userId, msg, reply_markup=None):
+def send_message(userId, msg, reply_markup=None, disable_notification=False):
     msg = msg.replace("-", "\\-").replace(".", "\\.").replace("!", "\\!").replace("(", "\\(").replace(")", "\\)")
-    return bot.send_message(userId, msg, parse_mode='MarkdownV2', reply_markup=reply_markup)
+    return bot.send_message(userId, msg, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification)
 
 
 bot.infinity_polling()

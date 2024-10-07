@@ -22,6 +22,22 @@ def getTextOperation(txt):
         return command, action
 
 
+def is_valid_time(time_str):
+    try:
+        time_str = time_str.strip()
+        time_str = re.sub(r"[., ]", ":", time_str)
+
+        try:
+            valid_time = datetime.strptime(time_str, "%H:%M")
+            return convert_time_to_hh_mm(valid_time)
+        except ValueError:
+            return None
+    except:
+        return False
+
+
+def convert_time_to_hh_mm(time_obj):
+    return time_obj.strftime("%H_%M")
 
 def strClear(input_str):
     if any(char.isdigit() for char in input_str):
