@@ -134,7 +134,13 @@ def dictToJson(d):
 def isMessageFromGroup(msg):
     return msg.chat.type != 'private'
 
-
+def isUserBanned(userId):
+    if IsUserExists(userId):
+        userId = str(userId)
+        reg = ReadBotJson(userId)
+        return reg.get('banned')
+    else:
+        return False
 
 
 lastTimeSended = None
@@ -259,7 +265,7 @@ def clearAuth(message):
 
 
 @bot.message_handler(commands=['cancelauth'])
-def clearAuth(message):
+def cancelauth(message):
     uid = str(message.chat.id)
     UserInfo = ReadBotJson(uid)
     UserInfo['WaitForAuth'] = False
@@ -269,7 +275,14 @@ def clearAuth(message):
 
 @bot.message_handler(commands=['auth'])
 def makeAuth(message, messageIsAnId=False):
+
+
+
     if messageIsAnId==False and isMessageFromGroup(message):
+        if isUserBanned(message):
+            send_message(message.chat.id, "\{ banned: true \}")
+            return
+
         if IsUserRegistered(message.chat.id) == False:
             send_welcome(message)
             return
@@ -284,6 +297,10 @@ def makeAuth(message, messageIsAnId=False):
 
     if IsUserExists(user) == False:
         send_welcome(user)
+        return
+
+    if isUserBanned(user):
+        send_message(user, "\{ banned: true \}")
         return
 
     SetWaitForLoginData(user, True)
@@ -309,15 +326,16 @@ def groupauth_callback(call):
     bot.answer_callback_query(call.id)
     data = call.data.split(":")
     whoClicked = str(call.from_user.id)
-    if IsUserExists(whoClicked):
+    if IsUserExists(whoClicked) and not isUserBanned(whoClicked):
         if IsUserRegistered(whoClicked):
             if not IsUserRegistered(data[1]):
                 SetWaitForLoginData(whoClicked, False)
                 keyboard = types.InlineKeyboardMarkup()
                 yesButton = types.InlineKeyboardButton(text="Да", callback_data=f"stateGroupAuth:True:"+data[1])
                 noButton = types.InlineKeyboardButton(text="Отмена", callback_data=f"stateGroupAuth:False:"+data[1])
-                keyboard.add(yesButton)
-                keyboard.add(noButton)
+                if not isUserBanned(whoClicked):
+                    keyboard.add(yesButton)
+                    keyboard.add(noButton)
                 send_message(whoClicked, "Подтвердите, что вы хотите авторизоваться в группе \nID: `" + (str(data[1])) + '`\n\n Нажимая кнопку "Да" вы соглашаетесь с тем что ваши данные Journal будут использованы для группы.',reply_markup=keyboard)
             else:
                 send_message(whoClicked, "Вы не можете авторизовать группу так как она уже кем то авторизована. Напищите в группе комманду `/clearauth` для привязки ваших данных к группе")
@@ -325,7 +343,8 @@ def groupauth_callback(call):
             send_message(whoClicked, "Ваши данные не зарегистрированы. Пожалуйста, сперва сначала пройдите процесс авторизации /auth")
     else:
         try:
-            send_message(whoClicked, "Чтобы авторизоваться в группе, необходимо зарегистрироваться ваш Telegram аккаунт в боте.\n\nДля этого нужно использовать комманду /auth")
+            if not isUserBanned(whoClicked):
+                send_message(whoClicked, "Чтобы авторизоваться в группе, необходимо зарегистрироваться ваш Telegram аккаунт в боте.\n\nДля этого нужно использовать комманду /auth")
         except:
             pass
 
@@ -425,6 +444,8 @@ def notifier(message):
 
 def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
     if IsUserRegistered(uid):
+        if isUserBanned(uid):
+            return
 
 
         basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
@@ -459,6 +480,10 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
 def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
     if IsUserRegistered(uid):
+
+        if isUserBanned(message.from_user.id):
+            return
+
         global showingText
         global operationDay
         sended_msg = Sended
@@ -632,7 +657,7 @@ def stateGroupAuth(call):
     uid = str(call.from_user.id)
     accepted = call.data.split(":")[1]
     groupId = call.data.split(":")[2]
-    if accepted == 'True':
+    if accepted == 'True' and not isUserBanned(call.from_user.id):
         if not IsUserRegistered(groupId):
             if IsUserExists(call.from_user.id):
                 if IsUserRegistered(call.from_user.id):
@@ -669,7 +694,8 @@ def stateGroupAuth(call):
         else:
             bot.send_message(call.from_user.id, "Кто-то уже привязал группу. Выполнить действие невозможно.")
     else:
-        bot.send_message(call.from_user.id, "Как скажете, если передумаете - просто нажмите кнопку \"Да\" выше")
+        if not isUserBanned(call.from_user.id):
+            bot.send_message(call.from_user.id, "Как скажете, если передумаете - просто нажмите кнопку \"Да\" выше")
 
 
 
