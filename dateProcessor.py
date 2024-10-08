@@ -1,8 +1,6 @@
 import re
 from datetime import datetime
 
-from openpyxl.styles.builtins import comma
-
 
 #Making check if user says "/shed +1" for next day or etc
 def isItPlusOperation(txt):

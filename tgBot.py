@@ -28,23 +28,26 @@ def reInitTime():
 
 
 def backgroundSend():
-    reInitTime()
-    mscTime = moscowTime.strftime("%H_%M")
+    while True:
+        try:
+            time.sleep(10)
+            reInitTime()
+            mscTime = moscowTime.strftime("%H_%M")
 
-    print('mscTime:', mscTime)
+            print('mscTime:', mscTime)
 
-    if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
-        for user in os.listdir(userFolderPath+'/notifyList/'+mscTime):
-            uid = user
-            #Auth and send notify
-            tkn = EaseAuth(uid)
-            if type(tkn) == str:
-                sheduleNotifySender(uid, tkn)
-    time.sleep(10)
-    try:
-        backgroundSend()
-    except:
-        backgroundSend()
+            if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
+                for user in os.listdir(userFolderPath+'/notifyList/'+mscTime):
+                    uid = user
+                    #Auth and send notify
+                    tkn = EaseAuth(uid)
+                    if type(tkn) == str:
+                        sheduleNotifySender(uid, tkn)
+        except:
+            try:
+                backgroundSend()
+            except:
+                backgroundSend()
 
 notifier = Thread(target=backgroundSend)
 notifier.start()
@@ -601,5 +604,10 @@ def send_message(userId, msg, reply_markup=None, disable_notification=False):
     return bot.send_message(userId, msg, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification)
 
 
-bot.infinity_polling()
+while True:
+    try:
+        bot.infinity_polling()
+    except Exception as e:
+        logging.error(f"Ошибка подключения: {e} Relaunching...")
+        time.sleep(1)
 
