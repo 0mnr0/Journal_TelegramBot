@@ -550,72 +550,78 @@ def fetchDate(message, Relaunch=False, Sended=None):
 @bot.message_handler(commands=['cleanauthingroups'])
 def globalCleaner(message):
     uid = str(message.chat.id)
-    if os.path.exists(userFolderPath + '/' + uid + '/list.inf'):
-        userConnectedGroups = ReadFile(uid + '/list.inf').split("\n")
-        print("userConnectedGroups: ",userConnectedGroups)
-        for groupid in userConnectedGroups:
-            print(groupid, userFolderPath + '/' + groupid, os.path.exists(userFolderPath + '/' + groupid))
-            if os.path.exists(userFolderPath + '/' + groupid) and groupid != '':
-                try:
-                    groupInt = int(groupid)
-                    userConnectedGroups.remove(groupid)
-                    SaveFileByList(uid + '/list.inf', userConnectedGroups)
+    if not isMessageFromGroup(message):
+        if os.path.exists(userFolderPath + '/' + uid + '/list.inf'):
+            userConnectedGroups = ReadFile(uid + '/list.inf').split("\n")
+            print("userConnectedGroups: ",userConnectedGroups)
+            for groupid in userConnectedGroups:
+                print(groupid, userFolderPath + '/' + groupid, os.path.exists(userFolderPath + '/' + groupid))
+                if os.path.exists(userFolderPath + '/' + groupid) and groupid != '':
+                    try:
+                        groupInt = int(groupid)
+                        userConnectedGroups.remove(groupid)
+                        SaveFileByList(uid + '/list.inf', userConnectedGroups)
 
-                    groupBotData = ReadJSON(groupid + '/botInfo.json')
-                    groupBotData['login'] = None
-                    groupBotData['password'] = None
-                    groupBotData['jwtToken'] = None
-                    groupBotData['jwtExpiries'] = None
-                    SaveJSON(groupid + '/botInfo.json', groupBotData)
-                    send_message(uid, "Авторизация для группы *"+groupid+"* очищена. Групп с вашей авторизацией осталось: "+(str(len(userConnectedGroups))))
-                    send_message(groupInt, """Авторизация для этой группы была отозвана. Используйте комманду /auth чтобы зарегистрировать этого бота.""")
-                except Exception as e:
-                    send_message(uid, e)
+                        groupBotData = ReadJSON(groupid + '/botInfo.json')
+                        groupBotData['login'] = None
+                        groupBotData['password'] = None
+                        groupBotData['jwtToken'] = None
+                        groupBotData['jwtExpiries'] = None
+                        SaveJSON(groupid + '/botInfo.json', groupBotData)
+                        send_message(uid, "Авторизация для группы *"+groupid+"* очищена. Групп с вашей авторизацией осталось: "+(str(len(userConnectedGroups))))
+                        send_message(groupInt, """Авторизация для этой группы была отозвана. Используйте комманду /auth чтобы зарегистрировать этого бота.""")
+                    except Exception as e:
+                        send_message(uid, e)
 
+        else:
+            send_message(uid, "У вас нет ни одной привязанной группы!")
     else:
-        send_message(uid, "У вас нет ни одной привязанной группы!")
+        bot.reply_to(message, "Вы не можете использовать эту комманду в группах!")
 
 
 @bot.message_handler(commands=['cleanauthbyid'])
 def cleanerById(message):
     uid = str(message.chat.id)
-    if os.path.exists(userFolderPath + '/' + uid):
-        keys = message.text.split(" ")
-        if len(keys) == 2:
-            groupid = keys[1]
-            if os.path.exists(userFolderPath + '/' + groupid):
-                userConnectedGroups = ReadFile(uid+'/list.inf').split("\n")
+    if not isMessageFromGroup(message):
+        if os.path.exists(userFolderPath + '/' + uid):
+            keys = message.text.split(" ")
+            if len(keys) == 2:
+                groupid = keys[1]
+                if os.path.exists(userFolderPath + '/' + groupid):
+                    userConnectedGroups = ReadFile(uid+'/list.inf').split("\n")
 
-                if groupid in userConnectedGroups and type(groupid) == str:
-                    try:
-                        groupInt = int(groupid)
-                        userConnectedGroups.remove(groupid)
-                        SaveFileByList(uid+'/list.inf', userConnectedGroups)
+                    if groupid in userConnectedGroups and type(groupid) == str:
+                        try:
+                            groupInt = int(groupid)
+                            userConnectedGroups.remove(groupid)
+                            SaveFileByList(uid+'/list.inf', userConnectedGroups)
 
-                        groupBotData = ReadJSON(groupid+'/botInfo.json')
-                        groupBotData['login'] = None
-                        groupBotData['password'] = None
-                        groupBotData['jwtToken'] = None
-                        groupBotData['jwtExpiries'] = None
-                        SaveJSON(groupid+'/botInfo.json', groupBotData)
-                        send_message(uid, "Авторизация для группы *"+groupid+"* очищена.")
-                        send_message(groupInt, "Данные авторизации для этой группы больше не активны. Невозможно запрашивать данные. Пройдите авторизацию с помощью /auth")
+                            groupBotData = ReadJSON(groupid+'/botInfo.json')
+                            groupBotData['login'] = None
+                            groupBotData['password'] = None
+                            groupBotData['jwtToken'] = None
+                            groupBotData['jwtExpiries'] = None
+                            SaveJSON(groupid+'/botInfo.json', groupBotData)
+                            send_message(uid, "Авторизация для группы *"+groupid+"* очищена.")
+                            send_message(groupInt, "Данные авторизации для этой группы больше не активны. Невозможно запрашивать данные. Пройдите авторизацию с помощью /auth")
 
-                    except Exception as e:
-                        send_message(uid, e)
+                        except Exception as e:
+                            send_message(uid, e)
+
+                    else:
+                        send_message(uid, "Вы не владеете данными в этой группе. Мы не можем дать доступ к группе")
+
+
+
 
                 else:
-                    send_message(uid, "Вы не владеете данными в этой группе. Мы не можем дать доступ к группе")
-
-
-
-
+                    send_message(uid, "Не можем найти группу проверьте её написание. Сначала выполните команду /start")
             else:
-                send_message(uid, "Не можем найти группу проверьте её написание. Сначала выполните команду /start")
+                send_message(uid, "После комманды укажите ID чата группы где вы хотите отвязать авторизацию. Пример: */cleanauthbyid "+uid+"*")
         else:
-            send_message(uid, "После комманды укажите ID чата группы где вы хотите отвязать авторизацию. Пример: */cleanauthbyid "+uid+"*")
+            send_message(uid, "Не можем найти ваш профиль. Сначала выполните команду /start")
     else:
-        send_message(uid, "Не можем найти ваш профиль. Сначала выполните команду /start")
+        bot.reply_to(message, "Вы не можете использовать эту комманду в группах!")
 
 
 listOfAuthGroups = []
