@@ -145,7 +145,7 @@ def cleanNotifyList(uid):
         for userId in os.listdir(userFolderPath+'/notifyList/'+time):
             if userId == uid:
                 os.rmdir(userFolderPath+'/notifyList/'+time+'/'+userId)
-                send_message(uid, "*Notifier*: \nУведомления для времени \""+time.replace("_",":")+"\" отключены")
+                send_message(uid, "*Notifier*: \nУведомления для времени \""+time.replace("_",":")+"\" отключены", disable_notification=True)
 
 lastTimeSended = None
 alreadyNotified = []
