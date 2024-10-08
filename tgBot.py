@@ -44,41 +44,60 @@ def reInitTime():
 
 
 lastTimeSended = None
-listNotifiedUsers = []
+alreadyNotified = []
+maxLengthOfUsers = 0
 def backgroundSend():
+
+    def SendNotify(uid, tkn, userDayMovement, userDaySilent):
+        sheduleNotifySender(uid, tkn, userDayMovement, userDaySilent)
+
     global lastTimeSended
     while True:
         try:
-            time.sleep(10)
+            global alreadyNotified
             reInitTime()
             mscTime = moscowTime.strftime("%H_%M")
-            if lastTimeSended != mscTime:
-                lastTimeSended = mscTime
-            else:
-                return
+            maxLengthOfUsers = 0
 
-            print('mscTime:', mscTime)
+
 
             if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
-                for user in os.listdir(userFolderPath+'/notifyList/'+mscTime):
+                maxLengthOfUsers = len(os.listdir(userFolderPath+'/notifyList/'+mscTime))
 
-                    uid = user
-                    #Auth and send notify
-                    print('uid:', uid)
-                    uidData = ReadBotJson(uid)
-                    userDayMovement = uidData.get('notifyPlus')
-                    userDaySilent = (uidData.get('notifySilent') == True)
-                    print('userDaySilent:', userDaySilent)
-                    tkn = EaseAuth(uid)
-                    print('tkn:', tkn)
-                    if type(tkn) == str:
-                        sheduleNotifySender(uid, tkn, userDayMovement, userDaySilent)
+
+            if lastTimeSended != mscTime or maxLengthOfUsers > len(alreadyNotified):
+                if lastTimeSended != mscTime:
+                    alreadyNotified = []
+                lastTimeSended = mscTime
+
+
+                if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
+                    for user in os.listdir(userFolderPath+'/notifyList/'+mscTime):
+                        print("alreadyNotified:", alreadyNotified)
+                        if user not in alreadyNotified:
+                            uid = user
+
+                            #Auth and send notify
+                            uidData = ReadBotJson(uid)
+                            userDayMovement = uidData.get('notifyPlus')
+                            userDaySilent = (uidData.get('notifySilent') == True)
+                            tkn = EaseAuth(uid)
+
+                            notifyForUser = Thread(target=SendNotify, args=(uid, tkn, userDayMovement, userDaySilent))
+                            notifyForUser.start()
+                            alreadyNotified.append(uid)
+
+
         except Exception as e:
             raise e
-            try:
-                backgroundSend()
-            except:
-                backgroundSend()
+
+        time.sleep(10)
+        try:
+            backgroundSend()
+        except:
+            backgroundSend()
+
+    print('END')
 
 notifier = Thread(target=backgroundSend)
 notifier.start()
@@ -592,7 +611,7 @@ def echo_message(message):
 
 
     elif ui.get('WaitForAuth') and not isMessageFromGroup(message):
-
+        # Sometimes happens an error on next line (notifySetup issue)
         login, pasw = text.replace(' ', '').split(',')
         send_message(uid,
                      "Мы выполним вход в ваш аккаунт для проверки пароля. Мы уведомим вас сразу после того как нам придёт ответ от Journal")
