@@ -309,6 +309,8 @@ def makeAuth(message, messageIsAnId=False):
         return
 
     SetWaitForLoginData(user, True)
+    SetWaitForNotify(user, False)
+
     send_message(user, """
 Начнём авторизацию. Чтобы авторизоваться в сервисе нужно указать логин, поставить запятую и указать пароль.\nПример:```MyLogin_ab01,Password12345!```\n\n
 Если по каким-то причинам вы не можете авторизоваться через бота выполните команду /auth через какое-то время.
