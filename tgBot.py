@@ -52,7 +52,10 @@ def backgroundSend():
             time.sleep(10)
             reInitTime()
             mscTime = moscowTime.strftime("%H_%M")
-
+            if lastTimeSended != mscTime:
+                lastTimeSended = mscTime
+            else:
+                return
 
             print('mscTime:', mscTime)
 
