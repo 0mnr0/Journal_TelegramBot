@@ -140,6 +140,12 @@ def isUserBanned(userId):
     else:
         return False
 
+def cleanNotifyList(uid):
+    for time in os.listdir(userFolderPath+'/notifyList/'):
+        for userId in os.listdir(userFolderPath+'/notifyList/'+time):
+            if userId == uid:
+                os.rmdir(userFolderPath+'/notifyList/'+time+'/'+userId)
+                send_message(uid, "*Notifier*: \nУведомления для времени \""+time.replace("_",":")+"\" отключены")
 
 lastTimeSended = None
 alreadyNotified = []
@@ -158,7 +164,7 @@ def backgroundSend():
             maxLengthOfUsers = 0
 
 
-
+            print(mscTime)
             if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
                 maxLengthOfUsers = len(os.listdir(userFolderPath+'/notifyList/'+mscTime))
 
@@ -266,9 +272,10 @@ def clearAuth(message):
 def cancelauth(message):
     uid = str(message.chat.id)
     UserInfo = ReadBotJson(uid)
-    UserInfo['WaitForAuth'] = False
-    SaveJSON(uid + '/botInfo.json', UserInfo)
-    send_message(uid, "Авторизация отменена. Чтобы привязать данные авторизации используйте /auth")
+    if UserInfo is not None:
+        UserInfo['WaitForAuth'] = False
+        SaveJSON(uid + '/botInfo.json', UserInfo)
+        send_message(uid, "Авторизация отменена. Чтобы привязать данные авторизации используйте /auth")
 
 
 @bot.message_handler(commands=['auth'])
@@ -357,12 +364,16 @@ def printHelp(message):
 */cancelauth* - Отмена ожидания авторизации
 */clearauth* - Очистка данных авторизации
 */help*, */помощь* - Список комманд
+*/cleanauthingroups* - Очистить авторизации групп поочерёдно
+*/cleanauthbyid* - Очистка авторизации группы по её ID
+*/passnotify* - Убрать отправку расписания
+*/notifyme* - Настроить ежедневную отправку расписания в формате часы:минуты
 
 ----
 */sched*, */shed*, */пары*, */расписание*, *пары*, *!пары* - Показать расписание 
 
 *Поддерживает параметры*
-/? <завтра, послезавтра, вчера, 2024-01-01, сегодня, +X, -X >
+/shed <завтра, послезавтра, вчера, 2024-01-01, сегодня, +X, -X >
 Значение по умолчанию: сегодня    
 
 Команды: *!пары* и *!расписание* можно использовать в контексте. Пример:
@@ -427,7 +438,14 @@ def ReAuthInSystem(message):
         return None
 
 
-@bot.message_handler(commands=['notifyme'])
+@bot.message_handler(commands=['passnotify'])
+def cancelNotify(message):
+    uid = str(message.chat.id)
+    cleanNotifyList(uid)
+
+
+
+@bot.message_handler(commands=['notifyme', 'notify'])
 def notifier(message):
     uid = str(message.chat.id)
 
@@ -747,6 +765,7 @@ def echo_message(message):
 
         isTimeNormal = is_valid_time(userTime)
         if isTimeNormal:
+            cleanNotifyList(uid)
             send_message(uid, "Уведомления успешно активированы. Время уведомлений: " + userTime)
 
             userBotInfo = ReadJSON(uid + '/botInfo.json')
