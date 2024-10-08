@@ -1,5 +1,8 @@
 from threading import *
 
+from numpy.f2py.auxfuncs import throw_error
+from werkzeug.serving import is_ssl_error
+
 from dateProcessor import *
 import logging
 import json
@@ -40,24 +43,35 @@ def reInitTime():
 
 
 
-
+lastTimeSended = None
+listNotifiedUsers = []
 def backgroundSend():
+    global lastTimeSended
     while True:
         try:
             time.sleep(10)
             reInitTime()
             mscTime = moscowTime.strftime("%H_%M")
 
+
             print('mscTime:', mscTime)
 
             if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
                 for user in os.listdir(userFolderPath+'/notifyList/'+mscTime):
+
                     uid = user
                     #Auth and send notify
+                    print('uid:', uid)
+                    uidData = ReadBotJson(uid)
+                    userDayMovement = uidData.get('notifyPlus')
+                    userDaySilent = (uidData.get('notifySilent') == True)
+                    print('userDaySilent:', userDaySilent)
                     tkn = EaseAuth(uid)
+                    print('tkn:', tkn)
                     if type(tkn) == str:
-                        sheduleNotifySender(uid, tkn)
-        except:
+                        sheduleNotifySender(uid, tkn, userDayMovement, userDaySilent)
+        except Exception as e:
+            raise e
             try:
                 backgroundSend()
             except:
@@ -345,16 +359,29 @@ def ReAuthInSystem(message):
 def notifier(message):
     uid = str(message.chat.id)
 
-    bot.send_message(uid, "Вы настраиваете уведомления\. Отправьте время в формате часы:минуты в формате МСК времени\.\n\nПример сообщения: ```10:00``` или ```06\.30```", parse_mode='MarkdownV2')
+    send_message(uid, """
+Вы настраиваете уведомления. Отправьте время в формате часы:минуты в формате МСК времени.\n\nПример сообщения: ```10:00``` или ```06.30```\n\n
+Вы также можете дополнить сообщение если нужно получить расписание на следющий день, например: */notify 23:00 1*\n
+Единица в команде указывает кол-во сдвигов по дням, то есть если указать 1 то бот пришлёт расписание на следующий день.\n
+\nВы так-же можете дописать *silent* к вашей команде что заставит бота отправлять расписание "без звука" *Примеры*: ``` 23:00 1 silent```\n``` 10.00 silent``` 
+""")
     SetWaitForNotify(uid, True)
 
 
-def sheduleNotifySender(uid, lastJwt):
+def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
     if IsUserRegistered(uid):
 
 
         basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
-        date = datetime.today().strftime('%Y-%m-%d')
+        date = datetime.today()
+        try:
+            additionalDay = int(additionalDay)
+        except:
+            additionalDay = 0
+
+        date = date + timedelta(days=additionalDay)
+
+        date=(date.strftime('%Y-%m-%d'))
         print('silentDay:', date)
         # https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
 
@@ -369,16 +396,13 @@ def sheduleNotifySender(uid, lastJwt):
                     'room_name') + ")\n"
                 finalText += "```"
 
-            print('Trying to edit msg')
-            bot.send_message(uid, text="*Notifier*\nПары на `" + date + "`:\n\n" + finalText,
-                             parse_mode='MarkdownV2')
-            print('Edited!')
+            send_message(uid, "*Notifier*\nПары на `" + date + "`:\n\n" + finalText,  disable_notification=silent)
+
 
 
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed'])
 def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
-    print('shedulecall: ',message)
     if IsUserRegistered(uid):
         global showingText
         global operationDay
@@ -543,10 +567,21 @@ def echo_message(message):
     if ui.get('notifySetup'):
         SetWaitForNotify(uid, False)
         SetWaitForLoginData(uid, False)
-        userTime = text.replace(' ','')
+        args = text.split(" ")
+        userTime = args[0].replace(' ','').replace('silent','')
+
         isTimeNormal = is_valid_time(userTime)
         if isTimeNormal:
             send_message(uid, "Уведомления успешно активированы. Время уведомлений: " + userTime)
+
+            userBotInfo = ReadJSON(uid + '/botInfo.json')
+            if len(args) > 1:
+                userBotInfo['notifyPlus'] = args[1]
+            userBotInfo['notifySilent'] = 'silent' in text
+            SaveJSON(uid + '/botInfo.json', userBotInfo)
+
+
+
             CreateFolderIfNotExists(userFolderPath + '/notifyList/' + isTimeNormal)
             CreateFolderIfNotExists(userFolderPath + '/notifyList/' + isTimeNormal + '/'+uid)
         else:
