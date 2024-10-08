@@ -6,7 +6,7 @@ from datetime import datetime
 def isItPlusOperation(txt):
     try:
         first_part, second_part = txt.split(' ', 1)
-        command = (second_part.replace(' ','')) [0]
+        command = (second_part.replace(' ',''))[0]
         return command == '+' or command == '-'
     except:
         return False
@@ -14,7 +14,7 @@ def isItPlusOperation(txt):
 def getTextOperation(txt):
     first_part, second_part = txt.split(' ', 1)
     command = (second_part.replace(' ','')) [0]
-    action = (second_part.replace(' ',''))[1::]
+    action = (second_part.replace(' ',''))[1:]
     if command == '+' or command == '-':
         action = action.replace('+','').replace('-','')
         return command, action

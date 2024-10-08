@@ -11,6 +11,20 @@ import telebot
 import shutil
 from telebot import types
 
+
+logFile = "botLogs.txt"
+
+if os.path.exists(logFile):
+    os.remove(logFile)
+
+# Настройка логирования
+logging.basicConfig(
+    filename=logFile,
+    level=logging.DEBUG,          # Уровень логирования (DEBUG для записи всех событий)
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Формат сообщения
+    datefmt='%Y-%m-%d %H:%M:%S'   # Формат времени
+)
+
 userFolderPath = 'userInfo'
 
 API_TOKEN = open('tkn.ini', 'r').read()
@@ -480,7 +494,7 @@ def stateGroupAuth(call):
         else:
             bot.send_message(call.from_user.id, "Кто-то уже привязал группу. Выполнить действие невозможно.")
     else:
-        bot.send_message(call.from_user.id, "Отмена")
+        bot.send_message(call.from_user.id, "Как скажете, если передумаете - просто нажмите кнопку \"Да\" выше")
 
 
 
@@ -528,6 +542,7 @@ def echo_message(message):
 
     if ui.get('notifySetup'):
         SetWaitForNotify(uid, False)
+        SetWaitForLoginData(uid, False)
         userTime = text.replace(' ','')
         isTimeNormal = is_valid_time(userTime)
         if isTimeNormal:
@@ -607,6 +622,7 @@ def send_message(userId, msg, reply_markup=None, disable_notification=False):
 while True:
     try:
         bot.infinity_polling()
+        print("Pooled")
     except Exception as e:
         logging.error(f"Ошибка подключения: {e} Relaunching...")
         time.sleep(1)
