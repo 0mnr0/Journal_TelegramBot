@@ -89,7 +89,12 @@ def SaveFileByList(pathToFile, list):
     pathToFile = userFolderPath + '/' + pathToFile
     with open(pathToFile, 'w', encoding='utf-8') as f:
         for item in list:
-            f.write(item + '\n')
+            if item != '':
+                #If last line then no append \n
+                if item == list[-1]:
+                    f.write(item)
+                else:
+                    f.write(item + '\n')
 
 def ReadFile(pathToFile):
     pathToFile = userFolderPath + '/' + pathToFile
@@ -105,7 +110,9 @@ def IsUserRegistered(userId):
     if IsUserExists(userId):
         userId = str(userId)
         reg = ReadBotJson(userId)
-        return (reg.get('login') != None and reg.get('password') != None)
+
+        rs = reg.get('login') is not None and reg.get('password') is not None
+        return rs
     else:
         return False
 
@@ -540,6 +547,35 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
 
 
+@bot.message_handler(commands=['cleanauthingroups'])
+def globalCleaner(message):
+    uid = str(message.chat.id)
+    if os.path.exists(userFolderPath + '/' + uid + '/list.inf'):
+        userConnectedGroups = ReadFile(uid + '/list.inf').split("\n")
+        print("userConnectedGroups: ",userConnectedGroups)
+        for groupid in userConnectedGroups:
+            print(groupid, userFolderPath + '/' + groupid, os.path.exists(userFolderPath + '/' + groupid))
+            if os.path.exists(userFolderPath + '/' + groupid) and groupid != '':
+                try:
+                    groupInt = int(groupid)
+                    userConnectedGroups.remove(groupid)
+                    SaveFileByList(uid + '/list.inf', userConnectedGroups)
+
+                    groupBotData = ReadJSON(groupid + '/botInfo.json')
+                    groupBotData['login'] = None
+                    groupBotData['password'] = None
+                    groupBotData['jwtToken'] = None
+                    groupBotData['jwtExpiries'] = None
+                    SaveJSON(groupid + '/botInfo.json', groupBotData)
+                    send_message(uid, "Авторизация для группы *"+groupid+"* очищена. Групп с вашей авторизацией осталось: "+(str(len(userConnectedGroups))))
+                    send_message(groupInt, """Авторизация для этой группы была отозвана. Используйте комманду /auth чтобы зарегистрировать этого бота.""")
+                except Exception as e:
+                    send_message(uid, e)
+
+    else:
+        send_message(uid, "У вас нет ни одной привязанной группы!")
+
+
 @bot.message_handler(commands=['cleanauthbyid'])
 def cleanerById(message):
     uid = str(message.chat.id)
@@ -599,6 +635,10 @@ def stateGroupAuth(call):
                     OriginalGroupInfo = ReadBotJson(groupId)
                     OriginalGroupInfo['login'] = OriginalUserInfo['login']
                     OriginalGroupInfo['password'] = OriginalUserInfo['password']
+                    OriginalGroupInfo['jwtToken'] = OriginalUserInfo['jwtToken']
+                    OriginalGroupInfo['jwtExpiries'] = OriginalUserInfo['jwtExpiries']
+
+                    SaveJSON(groupId + '/botInfo.json', OriginalGroupInfo)
 
                     listOfAuthGroups = []
                     if not os.path.exists(userFolderPath+'/'+ uid+ '/list.inf'):
@@ -612,6 +652,7 @@ def stateGroupAuth(call):
                         if groupId not in listOfAuthGroups:
                             listOfAuthGroups.append(groupId)
                         SaveFileByList(uid+ '/list.inf', listOfAuthGroups)
+
 
                     send_message(call.from_user.id, "Благодарим за активацию данных бота, мы постараемся не говорить кто активировал бота в группе :)")
                     send_message(groupId, "Кто-то успешно зарегестрировал бота в группе (ID:" + (str(groupId)) + ')')
