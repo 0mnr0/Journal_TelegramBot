@@ -40,10 +40,11 @@ def backgroundSend():
             tkn = EaseAuth(uid)
             if type(tkn) == str:
                 sheduleNotifySender(uid, tkn)
-
-
-    time.sleep(10)
-    backgroundSend()
+    sleep(10)
+    try:
+        backgroundSend()
+    except:
+        backgroundSend()
 
 notifier = Thread(target=backgroundSend)
 notifier.start()
