@@ -39,7 +39,94 @@ moscowTime = datetime.now()+timedelta(hours=1)
 
 def reInitTime():
     global moscowTime
-    moscowTime = datetime.now()+timedelta(hours=1)
+
+
+def CreateFolderIfNotExists(path):
+    if os.path.exists(path) != True:
+        os.mkdir(path)
+
+
+CreateFolderIfNotExists(userFolderPath)
+CreateFolderIfNotExists(userFolderPath+'/notifyList')
+
+def IsUserExists(userId):
+    userId = str(userId)
+    return os.path.exists(userFolderPath + '/' + userId)
+
+def ReadBotJson(userId):
+    if IsUserExists(userId):
+        userId = str(userId)
+        pathToJson = userFolderPath + '/' + userId + '/botInfo.json'
+        file = open(pathToJson, 'r', encoding='utf-8')
+        return json.loads(file.read())
+    else:
+        return None
+
+
+def ReadJSON(pathToJson):
+    pathToJson = userFolderPath + '/' + pathToJson
+    file = open(pathToJson, 'r', encoding='utf-8')
+    return json.loads(file.read())
+
+
+def SaveJSON(pathToJson, savingJSON):
+    pathToJson = userFolderPath + '/' + pathToJson
+    with open(pathToJson, 'w', encoding='utf-8') as f:
+        json.dump(savingJSON, f, ensure_ascii=False, indent=4)
+
+def CreateFile(pathToFile, text=None):
+    pathToFile = userFolderPath + '/' + pathToFile
+    with open(pathToFile, 'w', encoding='utf-8') as f:
+        if text is not None:
+            f.write(text)
+
+def SaveFile(pathToFile, text):
+    pathToFile = userFolderPath + '/' + pathToFile
+    with open(pathToFile, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+def SaveFileByList(pathToFile, list):
+    pathToFile = userFolderPath + '/' + pathToFile
+    with open(pathToFile, 'w', encoding='utf-8') as f:
+        for item in list:
+            f.write(item + '\n')
+
+def ReadFile(pathToFile):
+    pathToFile = userFolderPath + '/' + pathToFile
+    with open(pathToFile, 'r', encoding='utf-8') as f:
+        return f.read()
+
+def AppendToFile(pathToFile, text):
+    pathToFile = userFolderPath + '/' + pathToFile
+    with open(pathToFile, 'a', encoding='utf-8') as f:
+        f.write(text)
+
+def IsUserRegistered(userId):
+    if IsUserExists(userId):
+        userId = str(userId)
+        reg = ReadBotJson(userId)
+        return (reg.get('login') != None and reg.get('password') != None)
+    else:
+        return False
+
+def SetWaitForLoginData(userId, state):
+    userId = str(userId)
+    reg = ReadBotJson(userId)
+    reg['WaitForAuth'] = state
+    SaveJSON(userId + '/botInfo.json', reg)
+
+def SetWaitForNotify(userId, state):
+    userId = str(userId)
+    reg = ReadBotJson(userId)
+    reg['notifySetup'] = state
+    SaveJSON(userId + '/botInfo.json', reg)
+
+def dictToJson(d):
+    return json.dumps(d)
+
+def isMessageFromGroup(msg):
+    return msg.chat.type != 'private'
+
 
 
 
@@ -104,67 +191,6 @@ notifier.start()
 
 
 
-
-
-def CreateFolderIfNotExists(path):
-    if os.path.exists(path) != True:
-        os.mkdir(path)
-
-
-CreateFolderIfNotExists(userFolderPath)
-CreateFolderIfNotExists(userFolderPath+'/notifyList')
-
-def IsUserExists(userId):
-    userId = str(userId)
-    return os.path.exists(userFolderPath + '/' + userId)
-
-def ReadBotJson(userId):
-    if IsUserExists(userId):
-        userId = str(userId)
-        pathToJson = userFolderPath + '/' + userId + '/botInfo.json'
-        file = open(pathToJson, 'r', encoding='utf-8')
-        return json.loads(file.read())
-    else:
-        return None
-
-
-def ReadJSON(pathToJson):
-    pathToJson = userFolderPath + '/' + pathToJson
-    file = open(pathToJson, 'r', encoding='utf-8')
-    return json.loads(file.read())
-
-
-def SaveJSON(pathToJson, savingJSON):
-    pathToJson = userFolderPath + '/' + pathToJson
-    with open(pathToJson, 'w', encoding='utf-8') as f:
-        json.dump(savingJSON, f, ensure_ascii=False, indent=4)
-
-
-def IsUserRegistered(userId):
-    if IsUserExists(userId):
-        userId = str(userId)
-        reg = ReadBotJson(userId)
-        return (reg.get('login') != None and reg.get('password') != None)
-    else:
-        return False
-
-def SetWaitForLoginData(userId, state):
-    userId = str(userId)
-    reg = ReadBotJson(userId)
-    reg['WaitForAuth'] = state
-    SaveJSON(userId + '/botInfo.json', reg)
-
-def SetWaitForNotify(userId, state):
-    userId = str(userId)
-    reg = ReadBotJson(userId)
-    reg['notifySetup'] = state
-    SaveJSON(userId + '/botInfo.json', reg)
-
-def dictToJson(d):
-    return json.dumps(d)
-
-def isMessageFromGroup(msg):
-    return msg.chat.type != 'private'
 
 def UserRegister(userId, msgType):
     userId = str(userId)
@@ -514,11 +540,54 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
 
 
+@bot.message_handler(commands=['cleanauthbyid'])
+def cleanerById(message):
+    uid = str(message.chat.id)
+    if os.path.exists(userFolderPath + '/' + uid):
+        keys = message.text.split(" ")
+        if len(keys) == 2:
+            groupid = keys[1]
+            if os.path.exists(userFolderPath + '/' + groupid):
+                userConnectedGroups = ReadFile(uid+'/list.inf').split("\n")
+
+                if groupid in userConnectedGroups and type(groupid) == str:
+                    try:
+                        groupInt = int(groupid)
+                        userConnectedGroups.remove(groupid)
+                        SaveFileByList(uid+'/list.inf', userConnectedGroups)
+
+                        groupBotData = ReadJSON(groupid+'/botInfo.json')
+                        groupBotData['login'] = None
+                        groupBotData['password'] = None
+                        groupBotData['jwtToken'] = None
+                        groupBotData['jwtExpiries'] = None
+                        SaveJSON(groupid+'/botInfo.json', groupBotData)
+                        send_message(uid, "Авторизация для группы *"+groupid+"* очищена.")
+                        send_message(groupInt, "Данные авторизации для этой группы больше не активны. Невозможно запрашивать данные. Пройдите авторизацию с помощью /auth")
+
+                    except Exception as e:
+                        send_message(uid, e)
+
+                else:
+                    send_message(uid, "Вы не владеете данными в этой группе. Мы не можем дать доступ к группе")
 
 
+
+
+            else:
+                send_message(uid, "Не можем найти группу проверьте её написание. Сначала выполните команду /start")
+        else:
+            send_message(uid, "После комманды укажите ID чата группы где вы хотите отвязать авторизацию. Пример: */cleanauthbyid "+uid+"*")
+    else:
+        send_message(uid, "Не можем найти ваш профиль. Сначала выполните команду /start")
+
+
+listOfAuthGroups = []
 @bot.callback_query_handler(func=lambda call: call.data.startswith("stateGroupAuth"))
 def stateGroupAuth(call):
+    global listOfAuthGroups
     bot.answer_callback_query(call.id)
+    uid = str(call.from_user.id)
     accepted = call.data.split(":")[1]
     groupId = call.data.split(":")[2]
     if accepted == 'True':
@@ -530,7 +599,20 @@ def stateGroupAuth(call):
                     OriginalGroupInfo = ReadBotJson(groupId)
                     OriginalGroupInfo['login'] = OriginalUserInfo['login']
                     OriginalGroupInfo['password'] = OriginalUserInfo['password']
-                    SaveJSON(groupId + '/botInfo.json', OriginalGroupInfo)
+
+                    listOfAuthGroups = []
+                    if not os.path.exists(userFolderPath+'/'+ uid+ '/list.inf'):
+                        print(userFolderPath+'/'+ uid+ '/list.inf is not existing')
+                        CreateFile(uid+'/list.inf', groupId)
+                        listOfAuthGroups = [groupId]
+                    else:
+                        print("List is existsing!")
+                        listOfAuthGroups = ReadFile(uid+ '/list.inf')
+                        listOfAuthGroups = listOfAuthGroups.split("\n")
+                        if groupId not in listOfAuthGroups:
+                            listOfAuthGroups.append(groupId)
+                        SaveFileByList(uid+ '/list.inf', listOfAuthGroups)
+
                     send_message(call.from_user.id, "Благодарим за активацию данных бота, мы постараемся не говорить кто активировал бота в группе :)")
                     send_message(groupId, "Кто-то успешно зарегестрировал бота в группе (ID:" + (str(groupId)) + ')')
                 else:
@@ -682,5 +764,5 @@ while True:
         print("Pooled")
     except Exception as e:
         logging.error(f"Ошибка подключения: {e} Relaunching...")
-        time.sleep(1)
 
+    time.sleep(1)
