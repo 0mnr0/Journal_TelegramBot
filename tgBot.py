@@ -705,7 +705,7 @@ def stateGroupAuth(call):
 
 
                     send_message(call.from_user.id, "Благодарим за активацию данных бота, мы постараемся не говорить кто активировал бота в группе :)")
-                    send_message(groupId, "Кто-то успешно зарегестрировал бота в группе (ID:" + (str(groupId)) + ')')
+                    send_message(groupId, "Кто-то успешно зарегестрировал бота в группе (ID:" + (str(groupId)) + ')', disable_notification=True)
                 else:
                     send_message(call.from_user.id, "Ваши данные не зарегистрированы. Пожалуйста, выполните комманду /auth а затем зарегистрируйте бота в группе")
             else:
