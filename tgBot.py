@@ -37,6 +37,7 @@ moscowTime = datetime.now()+timedelta(hours=1)
 
 def reInitTime():
     global moscowTime
+    moscowTime = datetime.now()+timedelta(hours=1)
 
 
 def CreateFolderIfNotExists(path):
