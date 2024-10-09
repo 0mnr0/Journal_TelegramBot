@@ -491,7 +491,10 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
                     'room_name') + ")\n"
                 finalText += "```"
 
-            send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + finalText,  disable_notification=silent)
+            if silent:
+                send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + finalText, disable_notification=silent)
+            else:
+                send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + finalText, disable_notification=silent)
 
 
 
