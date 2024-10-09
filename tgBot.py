@@ -165,7 +165,6 @@ def backgroundSend():
             maxLengthOfUsers = 0
 
 
-            print(mscTime)
             if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
                 maxLengthOfUsers = len(os.listdir(userFolderPath+'/notifyList/'+mscTime))
 
@@ -373,7 +372,7 @@ def printHelp(message):
 */notifyme* - Настроить ежедневную отправку расписания в формате часы:минуты
 
 ----
-*/sched*, */shed*, */пары*, */расписание*, *пары*, *!пары* - Показать расписание 
+*/sched*, */shed*, */пары*, */расписание*, *!пары* - Показать расписание 
 
 *Поддерживает параметры*
 /shed <завтра, послезавтра, вчера, 2024-01-01, сегодня, +X, -X >
@@ -806,6 +805,7 @@ def echo_message(message):
             userInfo['password'] = pasw
             userInfo['jwtToken'] = responseJson.get('access_token')
             userInfo['jwtExpiries'] = responseJson.get('expires_in_access')
+            userInfo['jwtExpiries'] = responseJson.get('expires_in_access')
             if message.chat.type != 'private':
                 userInfo['chat_type'] = message.chat.type
             tkn = responseJson.get('access_token')
@@ -818,15 +818,15 @@ def echo_message(message):
                     userName = "{скрыто}"
                 else: userName = userName.get('full_name')
 
-                SetWaitForLoginData(uid, False)
+
                 send_message(uid, "Спасибо за авторизацию в боте, " + userName + '!\n\nТеперь у вас есть возможность запрашивать расписание для вашего Journal. :)')
 
             except Exception as e:
-                SetWaitForLoginData(uid, False)
                 print("Error", e)
                 send_message(uid, "Мы вошли в ваш аккаунт, но при получении допонительных данных произошла ошибка. Вы можете попробовать ещё раз или игнорировать это.\n(api/v2/settings/u-i: get() error)")
 
             SaveJSON(uid + '/botInfo.json', userInfo)
+            SetWaitForLoginData(uid, False)
 
         else:
             if auth.status_code == 422:
@@ -836,7 +836,7 @@ def echo_message(message):
                 send_message(uid, "Что-то пошло не так!")
         ui['WaitForAuth'] = False
 
-    if IsUserRegistered(uid) and not ui.get('WaitForAuth'):
+    elif IsUserRegistered(uid) and not ui.get('WaitForAuth'):
         if True:
             if '!пары' in message.text.lower() or '!gfhs' in message.text.lower() or '!расписание' in message.text.lower():
                 fetchDate(message)
