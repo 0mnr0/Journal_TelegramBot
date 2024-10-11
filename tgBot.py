@@ -13,6 +13,8 @@ import shutil
 from telebot import types
 
 
+#Version 1.0.1
+
 logFile = "botLogs.txt"
 
 if os.path.exists(logFile):
@@ -162,8 +164,13 @@ def backgroundSend():
             global alreadyNotified
             reInitTime()
             mscTime = moscowTime.strftime("%H_%M")
+            #Debug print
+
             maxLengthOfUsers = 0
 
+
+            logging.debug("#currentTime: " + mscTime)
+            logging.debug("os.path.exists("+userFolderPath+'/notifyList/'+mscTime+"): " + str(os.path.exists(userFolderPath+'/notifyList/'+mscTime)))
 
             if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
                 maxLengthOfUsers = len(os.listdir(userFolderPath+'/notifyList/'+mscTime))
@@ -576,6 +583,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     except: pass
                 bot.send_message(message.chat.id, text="Пары на `"+operationDay+"`:\n\n"+finalText, parse_mode='MarkdownV2')
                 print('Edited!')
+
             else:
                 ReAuthInSystem(message)
                 if not Relaunch:
