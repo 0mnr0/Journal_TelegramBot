@@ -1,6 +1,7 @@
 from threading import *
 
-
+import telegramify_markdown
+from telegramify_markdown import customize
 from dateProcessor import *
 import logging
 import json
@@ -492,15 +493,20 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
 
             finalText = ""
             for lesson in jsonResult:
-                finalText += '```Пара' + str(lesson.get('lesson')) + ':\n' + lesson.get('subject_name') + "\n"
-                finalText += lesson.get('started_at') + " - " + lesson.get('finished_at') + " (" + lesson.get(
-                    'room_name') + ")\n"
-                finalText += "```"
+                finalText += '>Пара ' + str(lesson.get('lesson')) + ':  ' + lesson.get('teacher_name') + '\n'
+                finalText += '```\n' + lesson.get('subject_name') + "\n"
+                finalText += lesson.get('started_at') + " - " + lesson.get('finished_at') + " (" + lesson.get('room_name') + ")\n"
+                finalText += "```\n"
 
+            converted = telegramify_markdown.markdownify(
+                finalText,
+                max_line_length=None,
+                normalize_whitespace=False
+            )
             if silent:
-                send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + finalText, disable_notification=silent)
+                send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent)
             else:
-                send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + finalText, disable_notification=silent)
+                send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent)
 
 
 
@@ -572,16 +578,24 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
                 finalText = ""
                 for lesson in jsonResult:
-                    finalText += '```Пара'+str(lesson.get('lesson'))+':\n'+ lesson.get('subject_name')+"\n"
+
+                    finalText += '>*Пара ' + str(lesson.get('lesson')) + ':  '+lesson.get('teacher_name')+'*\n'
+                    finalText += '```\n' + lesson.get('subject_name') + "\n"
                     finalText += lesson.get('started_at')+" - "+lesson.get('finished_at')+" ("+lesson.get('room_name')+")\n"
-                    finalText += "```"
+                    finalText += "```\n"
 
 
                 print('Trying to edit msg')
                 if sended_msg != None:
                     try: bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     except: pass
-                bot.send_message(message.chat.id, text="Пары на `"+operationDay+"`:\n\n"+finalText, parse_mode='MarkdownV2')
+
+                converted = telegramify_markdown.markdownify(
+                    finalText,
+                    max_line_length=None,
+                    normalize_whitespace=False
+                )
+                bot.send_message(message.chat.id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
                 print('Edited!')
 
             else:
