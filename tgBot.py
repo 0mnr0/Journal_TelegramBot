@@ -549,10 +549,10 @@ def fetchDate(message, Relaunch=False, Sended=None):
             operation, dayNum = getTextOperation(message.text)
             if operation == "+":
                 operationDay = datetime.today() + timedelta(days=int(dayNum))
-                showingText = operationDay
+                showingText = operationDay.strftime('%Y-%m-%d')
             elif operation == "-":
                 operationDay = datetime.today() - timedelta(days=int(dayNum))
-                showingText = operationDay
+                showingText = operationDay.strftime('%Y-%m-%d')
 
         if "послезавтра" in message.text.lower():
             showingText = "послезавтра"
@@ -603,6 +603,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     max_line_length=None,
                     normalize_whitespace=False
                 )
+                showingText = showingText.replace("-", "\\-")
                 bot.send_message(message.chat.id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
                 print('Edited!')
 
