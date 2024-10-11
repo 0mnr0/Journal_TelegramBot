@@ -165,6 +165,7 @@ def backgroundSend():
             global alreadyNotified
             reInitTime()
             mscTime = moscowTime.strftime("%H_%M")
+            print("currentTime: " + mscTime)
             #Debug print
 
             maxLengthOfUsers = 0
@@ -540,7 +541,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 convertedDate = parse_date(maybeItsADay)
                 operationDay = convertedDate
                 showingText = convertedDate
-            except:
+            except Exception as e:
                 operationDay = datetime.today()
                 showingText = "сегодня"
 
@@ -548,8 +549,10 @@ def fetchDate(message, Relaunch=False, Sended=None):
             operation, dayNum = getTextOperation(message.text)
             if operation == "+":
                 operationDay = datetime.today() + timedelta(days=int(dayNum))
+                showingText = operationDay
             elif operation == "-":
                 operationDay = datetime.today() - timedelta(days=int(dayNum))
+                showingText = operationDay
 
         if "послезавтра" in message.text.lower():
             showingText = "послезавтра"
