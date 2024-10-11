@@ -498,6 +498,9 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
                 finalText += lesson.get('started_at') + " - " + lesson.get('finished_at') + " (" + lesson.get('room_name') + ")\n"
                 finalText += "```\n"
 
+            if len(finalText) == 0:
+                finalText = "В этот день ничего нет :)"
+
             converted = telegramify_markdown.markdownify(
                 finalText,
                 max_line_length=None,
@@ -590,6 +593,8 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     try: bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     except: pass
 
+                if len(finalText) == 0:
+                    finalText="В этот день ничего нет :)"
                 converted = telegramify_markdown.markdownify(
                     finalText,
                     max_line_length=None,
