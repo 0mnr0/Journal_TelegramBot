@@ -455,6 +455,11 @@ def cancelNotify(message):
     cleanNotifyList(uid)
 
 
+@bot.message_handler(commands=['whatTimeForBot'])
+def whatTimeForBot(message):
+    uid = str(message.chat.id)
+    bot.send_message(uid, str(moscowTime.strftime("%H_%M")))
+
 
 @bot.message_handler(commands=['notifyme', 'notify'])
 def notifier(message):
