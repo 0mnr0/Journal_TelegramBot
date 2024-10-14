@@ -886,8 +886,12 @@ def callback_ok(call):
 
 
 def send_message(userId, msg, reply_markup=None, disable_notification=False):
-    msg = msg.replace("-", "\\-").replace(".", "\\.").replace("!", "\\!").replace("(", "\\(").replace(")", "\\)")
-    return bot.send_message(userId, msg, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification)
+    converted = telegramify_markdown.markdownify(
+        msg,
+        max_line_length=None,
+        normalize_whitespace=False
+    )
+    return bot.send_message(userId, converted, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification)
 
 
 while True:
