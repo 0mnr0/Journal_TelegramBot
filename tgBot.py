@@ -594,7 +594,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     except: pass
 
                 if len(finalText) == 0:
-                    finalText="В этот день ничего нет :)"
+                    finalText="В этот день ничего нет :D"
                 converted = telegramify_markdown.markdownify(
                     finalText,
                     max_line_length=None,
@@ -610,7 +610,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     fetchDate(message, True, sended_msg)
                 else:
-                    bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
+                    bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
         else:
             ReAuthInSystem(message)
 
@@ -618,7 +618,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                 fetchDate(message, True, sended_msg)
             else:
-                bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
+                bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
 
 
 @bot.message_handler(commands=['cleanauthingroups'])
