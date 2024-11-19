@@ -14,7 +14,7 @@ import shutil
 from telebot import types
 
 
-#Version 1.0.1
+#Version 1.1
 
 logFile = "botLogs.txt"
 
@@ -186,7 +186,6 @@ def backgroundSend():
 
                 if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
                     for user in os.listdir(userFolderPath+'/notifyList/'+mscTime):
-                        print("alreadyNotified:", alreadyNotified)
                         if user not in alreadyNotified:
                             uid = user
 
@@ -489,7 +488,7 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
 
         date = date + timedelta(days=additionalDay)
 
-        date=(date.strftime('%Y-%m-%d'))
+        date=date.strftime('%Y-%m-%d')
         print('silentDay:', date)
         # https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
 
@@ -512,6 +511,7 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
                 max_line_length=None,
                 normalize_whitespace=False
             )
+            converted = converted.replace("\\\\","\\")
             if silent:
                 send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent)
             else:
