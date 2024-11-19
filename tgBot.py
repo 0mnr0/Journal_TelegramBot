@@ -189,14 +189,10 @@ def backgroundSend():
                         notifyForUser.start()
                         alreadyNotified.append(uid)
 
-
-
-            time.sleep(5)
-
         except Exception as e:
             raise e
 
-        time.sleep(10)
+        time.sleep(5)
         try:
             backgroundSend()
         except:
@@ -504,6 +500,7 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
                 max_line_length=None,
                 normalize_whitespace=False
             )
+            silent = (silent==True)
 
             if silent:
                 bot.send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent, parse_mode='MarkdownV2')

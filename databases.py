@@ -47,7 +47,7 @@ def get_users_by_notification_time(time):
         user_data = {
             "uid": notif.get("uid"),
             "additionalDay": notif.get("additionalDay"),
-            "silent": notif.get("is_silent"),
+            "is_silent": notif.get("is_silent"),
             "created_at": notif.get("created_at"),
         }
         users.append(user_data)
