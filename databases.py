@@ -15,7 +15,6 @@ def add_user_to_notify_list(uid, time, day=None, is_silent=False):
     })
 
     if existing_entry:
-        print(f"Уведомление для пользователя {uid} на {time} уже существует.")
         return
 
     new_notification = {
@@ -27,7 +26,6 @@ def add_user_to_notify_list(uid, time, day=None, is_silent=False):
     }
 
     collection.insert_one(new_notification)
-    print(f"Уведомление для пользователя {uid} добавлено.")
 
 
 def clear_user_notify_list(uid):

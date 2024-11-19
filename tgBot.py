@@ -478,7 +478,6 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
         date = date + timedelta(days=additionalDay)
 
         date=date.strftime('%Y-%m-%d')
-        print('silentDay:', date)
         # https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
 
         fetchResult = get(basicUrl + date, lastJwt)
@@ -635,9 +634,7 @@ def globalCleaner(message):
     if not isMessageFromGroup(message):
         if os.path.exists(userFolderPath + '/' + uid + '/list.inf'):
             userConnectedGroups = ReadFile(uid + '/list.inf').split("\n")
-            print("userConnectedGroups: ",userConnectedGroups)
             for groupid in userConnectedGroups:
-                print(groupid, userFolderPath + '/' + groupid, os.path.exists(userFolderPath + '/' + groupid))
                 if os.path.exists(userFolderPath + '/' + groupid) and groupid != '':
                     try:
                         groupInt = int(groupid)
@@ -730,11 +727,9 @@ def stateGroupAuth(call):
 
                     listOfAuthGroups = []
                     if not os.path.exists(userFolderPath+'/'+ uid+ '/list.inf'):
-                        print(userFolderPath+'/'+ uid+ '/list.inf is not existing')
                         CreateFile(uid+'/list.inf', groupId)
                         listOfAuthGroups = [groupId]
                     else:
-                        print("List is existsing!")
                         listOfAuthGroups = ReadFile(uid+ '/list.inf')
                         listOfAuthGroups = listOfAuthGroups.split("\n")
                         if groupId not in listOfAuthGroups:
