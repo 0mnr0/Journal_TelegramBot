@@ -609,9 +609,10 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     normalize_whitespace=False
                 )
                 showingText = showingText.replace("-", "\\-")
-                bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
-                print('Edited:', sended_msg)
-
+                try:
+                    bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
+                except:
+                    bot.send_message(message.chat.id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
             else:
                 ReAuthInSystem(message)
                 if not Relaunch:
