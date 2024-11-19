@@ -36,12 +36,13 @@ API_TOKEN = open('tkn.ini', 'r').read()
 bot = telebot.TeleBot(API_TOKEN)
 logger = logging.getLogger('TeleBot').setLevel(logging.INFO)
 
+hoursCalibration = 4
 
-moscowTime = datetime.now()+timedelta(hours=3)
+moscowTime = datetime.now()+timedelta(hours=hoursCalibration)
 
 def reInitTime():
     global moscowTime
-    moscowTime = datetime.now()+timedelta(hours=3)
+    moscowTime = datetime.now()+timedelta(hours=hoursCalibration)
 
 
 def CreateFolderIfNotExists(path):
