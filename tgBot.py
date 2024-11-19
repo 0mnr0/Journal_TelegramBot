@@ -593,24 +593,24 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     finalText += "```\n"
 
 
-                print('Trying to edit msg')
                 if sended_msg is not None:
                     try:
-                        bot.edit_message_text( chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" +finalText, parse_mode='MarkdownV2')
+                        bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" +finalText, parse_mode='MarkdownV2')
                         return
                     except: pass
 
 
                 if len(finalText) == 0:
                     finalText="В этот день ничего нет :D"
+
                 converted = telegramify_markdown.markdownify(
                     finalText,
                     max_line_length=None,
                     normalize_whitespace=False
                 )
                 showingText = showingText.replace("-", "\\-")
-                bot.send_message(message.chat.id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
-                print('Edited!')
+                bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
+                print('Edited:', sended_msg)
 
             else:
                 ReAuthInSystem(message)
@@ -627,6 +627,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 fetchDate(message, True, sended_msg)
             else:
                 bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
+
 
 
 @bot.message_handler(commands=['cleanauthingroups'])
