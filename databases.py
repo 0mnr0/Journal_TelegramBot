@@ -36,7 +36,6 @@ def get_users_by_notification_time(time):
     notifications = collection.find({"time": time})
 
     if notifications.collection.count_documents({"time": time}) == 0:
-        print(f"Нет уведомлений для времени {time}.")
         return []
 
     # Выводим данные о пользователях
