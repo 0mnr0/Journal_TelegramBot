@@ -1,5 +1,5 @@
 from threading import *
-
+from telebot.types import ReactionTypeEmoji
 import telegramify_markdown
 from telegramify_markdown import customize
 from dateProcessor import *
@@ -519,6 +519,11 @@ def fetchDate(message, Relaunch=False, Sended=None):
         if isUserBanned(message.from_user.id):
             return
 
+        #if chat type not group
+        if not isMessageFromGroup(message):
+            bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👀')], is_big=False)
+
+
         global showingText
         global operationDay
         sended_msg = Sended
@@ -557,7 +562,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
         elif "завтра" in message.text.lower():
             showingText = "завтра"
             operationDay = operationDay + timedelta(days=1)
-        if "вчера" in message.text.lower():
+        elif "вчера" in message.text.lower():
             showingText = "вчера"
             operationDay = operationDay-timedelta(days=1)
 
@@ -589,9 +594,12 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
 
                 print('Trying to edit msg')
-                if sended_msg != None:
-                    try: bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                if sended_msg is not None:
+                    try:
+                        bot.edit_message_text( chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" +finalText, parse_mode='MarkdownV2')
+                        return
                     except: pass
+
 
                 if len(finalText) == 0:
                     finalText="В этот день ничего нет :D"
