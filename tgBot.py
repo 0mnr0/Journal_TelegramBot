@@ -37,11 +37,11 @@ bot = telebot.TeleBot(API_TOKEN)
 logger = logging.getLogger('TeleBot').setLevel(logging.INFO)
 
 
-moscowTime = datetime.now()+timedelta(hours=1)
+moscowTime = datetime.now()+timedelta(hours=3)
 
 def reInitTime():
     global moscowTime
-    moscowTime = datetime.now()+timedelta(hours=1)
+    moscowTime = datetime.now()+timedelta(hours=3)
 
 
 def CreateFolderIfNotExists(path):
