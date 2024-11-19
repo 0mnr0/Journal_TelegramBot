@@ -6,6 +6,7 @@ from dateProcessor import *
 import logging
 import json
 import os
+from databases import *
 import time
 from datetime import datetime, timedelta
 import requests
@@ -156,27 +157,17 @@ alreadyNotified = []
 maxLengthOfUsers = 0
 def backgroundSend():
 
-    def SendNotify(uid, tkn, userDayMovement, userDaySilent):
-        sheduleNotifySender(uid, tkn, userDayMovement, userDaySilent)
 
     global lastTimeSended
     while True:
         try:
             global alreadyNotified
             reInitTime()
-            mscTime = moscowTime.strftime("%H_%M")
+            mscTime = moscowTime.strftime("%H:%M")
             print("currentTime: " + mscTime)
-            #Debug print
+            maxLengthOfUsers = get_count_users_in_time(mscTime)
 
-            maxLengthOfUsers = 0
-
-
-            logging.debug("#currentTime: " + mscTime)
-            logging.debug("os.path.exists("+userFolderPath+'/notifyList/'+mscTime+"): " + str(os.path.exists(userFolderPath+'/notifyList/'+mscTime)))
-
-            if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
-                maxLengthOfUsers = len(os.listdir(userFolderPath+'/notifyList/'+mscTime))
-
+            usersToNotify = get_users_by_notification_time(mscTime)
 
             if lastTimeSended != mscTime or maxLengthOfUsers > len(alreadyNotified):
                 if lastTimeSended != mscTime:
@@ -184,21 +175,24 @@ def backgroundSend():
                 lastTimeSended = mscTime
 
 
-                if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
-                    for user in os.listdir(userFolderPath+'/notifyList/'+mscTime):
-                        if user not in alreadyNotified:
-                            uid = user
+                print("len(usersToNotify) > 0: ", len(usersToNotify) > 0)
+                if len(usersToNotify) > 0:
+                    for userData in usersToNotify:
+                        #if uid not in alreadyNotified
+                        if userData.get('uid') in alreadyNotified:
+                            continue
 
-                            #Auth and send notify
-                            uidData = ReadBotJson(uid)
-                            userDayMovement = uidData.get('notifyPlus')
-                            userDaySilent = (uidData.get('notifySilent') == True)
-                            tkn = EaseAuth(uid)
+                        print("userData:", userData)
+                        uid = userData.get('uid')
+                        userDayMovement = userData.get('additionalDay')
+                        userDaySilent = userData.get('is_silent')
+                        tkn = EaseAuth(uid)
+                        sheduleNotifySender(uid, tkn, userDayMovement, userDaySilent)
+                        alreadyNotified.append(uid)
 
-                            notifyForUser = Thread(target=SendNotify, args=(uid, tkn, userDayMovement, userDaySilent))
-                            notifyForUser.start()
-                            alreadyNotified.append(uid)
 
+
+            time.sleep(5)
 
         except Exception as e:
             raise e
@@ -209,7 +203,6 @@ def backgroundSend():
         except:
             backgroundSend()
 
-    print('END')
 
 notifier = Thread(target=backgroundSend)
 notifier.start()
@@ -451,6 +444,7 @@ def ReAuthInSystem(message):
 @bot.message_handler(commands=['passnotify'])
 def cancelNotify(message):
     uid = str(message.chat.id)
+    clear_user_notify_list(uid)
     cleanNotifyList(uid)
 
 
@@ -511,7 +505,7 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
                 max_line_length=None,
                 normalize_whitespace=False
             )
-            converted = converted.replace("\\\\","\\")
+
             if silent:
                 send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent)
             else:
@@ -802,23 +796,26 @@ def echo_message(message):
         SetWaitForNotify(uid, False)
         SetWaitForLoginData(uid, False)
         args = text.split(" ")
-        userTime = args[0].replace(' ','').replace('silent','')
+        userTime = args[0].replace(' ','').replace('silent','').replace('.',':').replace('_',':')
 
-        isTimeNormal = is_valid_time(userTime)
-        if isTimeNormal:
+        if is_valid_time(userTime):
+            ###
             cleanNotifyList(uid)
             send_message(uid, "Уведомления успешно активированы. Время уведомлений: " + userTime)
 
             userBotInfo = ReadJSON(uid + '/botInfo.json')
+            additionalDay = 0
             if len(args) > 1:
-                userBotInfo['notifyPlus'] = args[1]
+                additionalDay = args[1]
+                userBotInfo['notifyPlus'] = additionalDay
             userBotInfo['notifySilent'] = 'silent' in text
             SaveJSON(uid + '/botInfo.json', userBotInfo)
+            clear_user_notify_list(uid)
+            add_user_to_notify_list(uid, userTime, additionalDay, 'silent' in text)
 
 
-
-            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + isTimeNormal)
-            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + isTimeNormal + '/'+uid)
+            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + is_valid_time(userTime))
+            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + is_valid_time(userTime) + '/'+uid)
         else:
             send_message(uid, "Время уведомлений введено некорректно. Пожалуйста, выполните комманду /notifyme снова и введите время в формате HH:MM")
 
