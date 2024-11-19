@@ -175,19 +175,17 @@ def backgroundSend():
                 lastTimeSended = mscTime
 
 
-                print("len(usersToNotify) > 0: ", len(usersToNotify) > 0)
                 if len(usersToNotify) > 0:
                     for userData in usersToNotify:
-                        #if uid not in alreadyNotified
                         if userData.get('uid') in alreadyNotified:
                             continue
 
-                        print("userData:", userData)
                         uid = userData.get('uid')
                         userDayMovement = userData.get('additionalDay')
                         userDaySilent = userData.get('is_silent')
                         tkn = EaseAuth(uid)
-                        sheduleNotifySender(uid, tkn, userDayMovement, userDaySilent)
+                        notifyForUser = Thread(target=sheduleNotifySender, args=(uid, tkn, userDayMovement, userDaySilent))
+                        notifyForUser.start()
                         alreadyNotified.append(uid)
 
 
@@ -889,6 +887,7 @@ def send_message(userId, msg, reply_markup=None, disable_notification=False):
         normalize_whitespace=False
     )
     return bot.send_message(userId, converted, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification)
+
 
 
 while True:
