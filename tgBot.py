@@ -507,9 +507,9 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
             )
 
             if silent:
-                send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent)
+                bot.send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent)
             else:
-                send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent)
+                bot.send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent)
 
 
 
