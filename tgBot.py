@@ -1,6 +1,7 @@
 from threading import *
 
 import telegramify_markdown
+from telebot.types import ReactionTypeEmoji
 from telegramify_markdown import customize
 from dateProcessor import *
 import logging
@@ -522,6 +523,10 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed'])
 def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
+    forum = ( message.json['chat'].get('is_forum') == True)
+    print("forum:", forum)# Write it to file
+
+
     if IsUserRegistered(uid):
 
         if isUserBanned(message.from_user.id):
@@ -530,8 +535,8 @@ def fetchDate(message, Relaunch=False, Sended=None):
         global showingText
         global operationDay
         sended_msg = Sended
-        if Relaunch == False:
-            sended_msg = send_message(uid, "Секунду, ищем расписание...", disable_notification=True)
+        if not Relaunch:
+            bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👀')], is_big=False)
 
         uiInfo = ReadBotJson(uid)
         expiration_timestamp = uiInfo.get('jwtExpiries')
@@ -597,8 +602,10 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
 
                 print('Trying to edit msg')
-                if sended_msg != None:
-                    try: bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                if sended_msg is not None:
+                    print('Editing msg: ', sended_msg.message_id)
+                    try:
+                        bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     except: pass
 
                 if len(finalText) == 0:
@@ -609,7 +616,10 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     normalize_whitespace=False
                 )
                 showingText = showingText.replace("-", "\\-")
-                bot.send_message(message.chat.id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
+                if not forum:
+                    bot.send_message(message.chat.id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
+                else:
+                    bot.send_message(message.chat.id, message_thread_id=message.message_thread_id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
                 print('Edited!')
 
             else:
@@ -618,7 +628,11 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     fetchDate(message, True, sended_msg)
                 else:
-                    bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
+                    if not forum:
+                        bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
+                    else:
+                        bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", message_thread_id=message.message_thread_id, parse_mode='MarkdownV2')
+
         else:
             ReAuthInSystem(message)
 
@@ -626,8 +640,10 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                 fetchDate(message, True, sended_msg)
             else:
-                bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
-
+                if not forum:
+                    bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
+                else:
+                    bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", message_thread_id=message.message_thread_id, parse_mode='MarkdownV2')
 
 @bot.message_handler(commands=['cleanauthingroups'])
 def globalCleaner(message):
@@ -785,6 +801,7 @@ def post(url, js, authToken='null'):
 
 @bot.message_handler(func=lambda message: True)
 def echo_message(message):
+    print(json.dumps(message))
     uid = str(message.chat.id)
     text = message.text
     ui = ReadBotJson(uid)
