@@ -1,12 +1,12 @@
 from threading import *
-
-import telegramify_markdown
 from telebot.types import ReactionTypeEmoji
+import telegramify_markdown
 from telegramify_markdown import customize
 from dateProcessor import *
 import logging
 import json
 import os
+from databases import *
 import time
 from datetime import datetime, timedelta
 import requests
@@ -15,7 +15,7 @@ import shutil
 from telebot import types
 
 
-#Version 1.0.1
+#Version 1.1
 
 logFile = "botLogs.txt"
 
@@ -36,12 +36,13 @@ API_TOKEN = open('tkn.ini', 'r').read()
 bot = telebot.TeleBot(API_TOKEN)
 logger = logging.getLogger('TeleBot').setLevel(logging.INFO)
 
+hoursCalibration = 4
 
-moscowTime = datetime.now()+timedelta(hours=1)
+moscowTime = datetime.now()+timedelta(hours=hoursCalibration)
 
 def reInitTime():
     global moscowTime
-    moscowTime = datetime.now()+timedelta(hours=1)
+    moscowTime = datetime.now()+timedelta(hours=hoursCalibration)
 
 
 def CreateFolderIfNotExists(path):
@@ -157,27 +158,17 @@ alreadyNotified = []
 maxLengthOfUsers = 0
 def backgroundSend():
 
-    def SendNotify(uid, tkn, userDayMovement, userDaySilent):
-        sheduleNotifySender(uid, tkn, userDayMovement, userDaySilent)
 
     global lastTimeSended
     while True:
         try:
             global alreadyNotified
             reInitTime()
-            mscTime = moscowTime.strftime("%H_%M")
+            mscTime = moscowTime.strftime("%H:%M")
             print("currentTime: " + mscTime)
-            #Debug print
+            maxLengthOfUsers = get_count_users_in_time(mscTime)
 
-            maxLengthOfUsers = 0
-
-
-            logging.debug("#currentTime: " + mscTime)
-            logging.debug("os.path.exists("+userFolderPath+'/notifyList/'+mscTime+"): " + str(os.path.exists(userFolderPath+'/notifyList/'+mscTime)))
-
-            if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
-                maxLengthOfUsers = len(os.listdir(userFolderPath+'/notifyList/'+mscTime))
-
+            usersToNotify = get_users_by_notification_time(mscTime)
 
             if lastTimeSended != mscTime or maxLengthOfUsers > len(alreadyNotified):
                 if lastTimeSended != mscTime:
@@ -185,33 +176,28 @@ def backgroundSend():
                 lastTimeSended = mscTime
 
 
-                if os.path.exists(userFolderPath+'/notifyList/'+mscTime):
-                    for user in os.listdir(userFolderPath+'/notifyList/'+mscTime):
-                        print("alreadyNotified:", alreadyNotified)
-                        if user not in alreadyNotified:
-                            uid = user
+                if len(usersToNotify) > 0:
+                    for userData in usersToNotify:
+                        if userData.get('uid') in alreadyNotified:
+                            continue
 
-                            #Auth and send notify
-                            uidData = ReadBotJson(uid)
-                            userDayMovement = uidData.get('notifyPlus')
-                            userDaySilent = (uidData.get('notifySilent') == True)
-                            tkn = EaseAuth(uid)
-
-                            notifyForUser = Thread(target=SendNotify, args=(uid, tkn, userDayMovement, userDaySilent))
-                            notifyForUser.start()
-                            alreadyNotified.append(uid)
-
+                        uid = userData.get('uid')
+                        userDayMovement = userData.get('additionalDay')
+                        userDaySilent = userData.get('is_silent')
+                        tkn = EaseAuth(uid)
+                        notifyForUser = Thread(target=sheduleNotifySender, args=(uid, tkn, userDayMovement, userDaySilent))
+                        notifyForUser.start()
+                        alreadyNotified.append(uid)
 
         except Exception as e:
             raise e
 
-        time.sleep(10)
+        time.sleep(5)
         try:
             backgroundSend()
         except:
             backgroundSend()
 
-    print('END')
 
 notifier = Thread(target=backgroundSend)
 notifier.start()
@@ -453,6 +439,7 @@ def ReAuthInSystem(message):
 @bot.message_handler(commands=['passnotify'])
 def cancelNotify(message):
     uid = str(message.chat.id)
+    clear_user_notify_list(uid)
     cleanNotifyList(uid)
 
 
@@ -490,8 +477,7 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
 
         date = date + timedelta(days=additionalDay)
 
-        date=(date.strftime('%Y-%m-%d'))
-        print('silentDay:', date)
+        date=date.strftime('%Y-%m-%d')
         # https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
 
         fetchResult = get(basicUrl + date, lastJwt)
@@ -513,30 +499,33 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
                 max_line_length=None,
                 normalize_whitespace=False
             )
+            silent = (silent==True)
+
             if silent:
-                send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent)
+                bot.send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent, parse_mode='MarkdownV2')
             else:
-                send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent)
+                bot.send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent, parse_mode='MarkdownV2')
 
 
 
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed'])
 def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
-    forum = ( message.json['chat'].get('is_forum') == True)
-    print("forum:", forum)# Write it to file
-
-
     if IsUserRegistered(uid):
 
         if isUserBanned(message.from_user.id):
             return
 
+        #if chat type not group
+        if not isMessageFromGroup(message):
+            bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👀')], is_big=False)
+
+
         global showingText
         global operationDay
         sended_msg = Sended
-        if not Relaunch:
-            bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👀')], is_big=False)
+        if Relaunch == False:
+            sended_msg = send_message(uid, "Секунду, ищем расписание...", disable_notification=True)
 
         uiInfo = ReadBotJson(uid)
         expiration_timestamp = uiInfo.get('jwtExpiries')
@@ -570,7 +559,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
         elif "завтра" in message.text.lower():
             showingText = "завтра"
             operationDay = operationDay + timedelta(days=1)
-        if "вчера" in message.text.lower():
+        elif "вчера" in message.text.lower():
             showingText = "вчера"
             operationDay = operationDay-timedelta(days=1)
 
@@ -601,38 +590,33 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     finalText += "```\n"
 
 
-                print('Trying to edit msg')
                 if sended_msg is not None:
-                    print('Editing msg: ', sended_msg.message_id)
                     try:
-                        bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                        bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" +finalText, parse_mode='MarkdownV2')
+                        return
                     except: pass
 
+
                 if len(finalText) == 0:
-                    finalText="В этот день ничего нет :)"
+                    finalText="В этот день ничего нет :D"
+
                 converted = telegramify_markdown.markdownify(
                     finalText,
                     max_line_length=None,
                     normalize_whitespace=False
                 )
                 showingText = showingText.replace("-", "\\-")
-                if not forum:
+                try:
+                    bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
+                except:
                     bot.send_message(message.chat.id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
-                else:
-                    bot.send_message(message.chat.id, message_thread_id=message.message_thread_id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
-                print('Edited!')
-
             else:
                 ReAuthInSystem(message)
                 if not Relaunch:
                     bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     fetchDate(message, True, sended_msg)
                 else:
-                    if not forum:
-                        bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
-                    else:
-                        bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", message_thread_id=message.message_thread_id, parse_mode='MarkdownV2')
-
+                    bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
         else:
             ReAuthInSystem(message)
 
@@ -640,10 +624,9 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                 fetchDate(message, True, sended_msg)
             else:
-                if not forum:
-                    bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
-                else:
-                    bot.send_message(message.chat.id, text="Не удалось загрузить распиание. Что-то с JWT ключом...", message_thread_id=message.message_thread_id, parse_mode='MarkdownV2')
+                bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
+
+
 
 @bot.message_handler(commands=['cleanauthingroups'])
 def globalCleaner(message):
@@ -651,9 +634,7 @@ def globalCleaner(message):
     if not isMessageFromGroup(message):
         if os.path.exists(userFolderPath + '/' + uid + '/list.inf'):
             userConnectedGroups = ReadFile(uid + '/list.inf').split("\n")
-            print("userConnectedGroups: ",userConnectedGroups)
             for groupid in userConnectedGroups:
-                print(groupid, userFolderPath + '/' + groupid, os.path.exists(userFolderPath + '/' + groupid))
                 if os.path.exists(userFolderPath + '/' + groupid) and groupid != '':
                     try:
                         groupInt = int(groupid)
@@ -746,11 +727,9 @@ def stateGroupAuth(call):
 
                     listOfAuthGroups = []
                     if not os.path.exists(userFolderPath+'/'+ uid+ '/list.inf'):
-                        print(userFolderPath+'/'+ uid+ '/list.inf is not existing')
                         CreateFile(uid+'/list.inf', groupId)
                         listOfAuthGroups = [groupId]
                     else:
-                        print("List is existsing!")
                         listOfAuthGroups = ReadFile(uid+ '/list.inf')
                         listOfAuthGroups = listOfAuthGroups.split("\n")
                         if groupId not in listOfAuthGroups:
@@ -801,7 +780,6 @@ def post(url, js, authToken='null'):
 
 @bot.message_handler(func=lambda message: True)
 def echo_message(message):
-    print(json.dumps(message))
     uid = str(message.chat.id)
     text = message.text
     ui = ReadBotJson(uid)
@@ -819,23 +797,26 @@ def echo_message(message):
         SetWaitForNotify(uid, False)
         SetWaitForLoginData(uid, False)
         args = text.split(" ")
-        userTime = args[0].replace(' ','').replace('silent','')
+        userTime = args[0].replace(' ','').replace('silent','').replace('.',':').replace('_',':')
 
-        isTimeNormal = is_valid_time(userTime)
-        if isTimeNormal:
+        if is_valid_time(userTime):
+            ###
             cleanNotifyList(uid)
             send_message(uid, "Уведомления успешно активированы. Время уведомлений: " + userTime)
 
             userBotInfo = ReadJSON(uid + '/botInfo.json')
+            additionalDay = 0
             if len(args) > 1:
-                userBotInfo['notifyPlus'] = args[1]
+                additionalDay = args[1]
+                userBotInfo['notifyPlus'] = additionalDay
             userBotInfo['notifySilent'] = 'silent' in text
             SaveJSON(uid + '/botInfo.json', userBotInfo)
+            clear_user_notify_list(uid)
+            add_user_to_notify_list(uid, userTime, additionalDay, 'silent' in text)
 
 
-
-            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + isTimeNormal)
-            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + isTimeNormal + '/'+uid)
+            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + is_valid_time(userTime))
+            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + is_valid_time(userTime) + '/'+uid)
         else:
             send_message(uid, "Время уведомлений введено некорректно. Пожалуйста, выполните комманду /notifyme снова и введите время в формате HH:MM")
 
@@ -909,6 +890,7 @@ def send_message(userId, msg, reply_markup=None, disable_notification=False):
         normalize_whitespace=False
     )
     return bot.send_message(userId, converted, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification)
+
 
 
 while True:
