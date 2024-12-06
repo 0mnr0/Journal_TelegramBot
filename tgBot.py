@@ -229,6 +229,12 @@ def UserRegister(userId, msgType):
 # Handle '/start' and '/help'
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
+    forum = message.json['chat'].get("is_forum")
+    print("is forum:", forum)
+    if forum and message.message_thread_id is not None:
+        print("message_thread_id:", message.message_thread_id)
+        forum = message.message_thread_id
+
     if UserRegister(message.chat.id, message.chat.type) == False:
         keyboard = types.InlineKeyboardMarkup()
 
@@ -237,18 +243,18 @@ def send_welcome(message):
             keyboard.add(auth_button)
             bot.send_message(message.chat.id,
                 text="Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте.",
-                reply_markup=keyboard)
+                reply_markup=keyboard, message_thread_id=forum)
         else:
 
 
             additionalText = '\n\nID Группы: `'+str(message.chat.id)+'`.\nЗапомните ID выше и нажмите кнопку ниже, чтобы авторизовать бота в группе через личные сообщения (Обычная авторизация в группе недоступна из-за соображений безопасности).'
             send_message(message.chat.id,
-                         "Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте. " + additionalText)
+                         "Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте. " + additionalText, message_thread_id=forum)
 
             keyboard = types.InlineKeyboardMarkup()
             auth_button = types.InlineKeyboardButton(text="Авторизовать группу", callback_data=f"groupAuth:{message.chat.id}")
             keyboard.add(auth_button)
-            send_message(message.chat.id, "*Для нормальной работы бота выдайте ему роль администраотра*\n*Для того чтобы кнопка работала напишите ему в личные сообщения*\n\nАвторизация не доступна в группе. Используйте кнопку ниже для привязки аккаунту к группе:", reply_markup=keyboard)
+            send_message(message.chat.id, "*Для нормальной работы бота выдайте ему роль администраотра*\n*Для того чтобы кнопка работала напишите ему в личные сообщения*\n\nАвторизация не доступна в группе. Используйте кнопку ниже для привязки аккаунту к группе:", reply_markup=keyboard, message_thread_id=forum)
 
 
 # Функция для проверки прав администратора
@@ -258,20 +264,32 @@ def is_admin(chat_id):
 
 @bot.message_handler(commands=['clearauth'])
 def clearAuth(message):
+    forum = message.json['chat'].get("is_forum")
+    print("is forum:", forum)
+    if forum and message.message_thread_id is not None:
+        print("message_thread_id:", message.message_thread_id)
+        forum = message.message_thread_id
+
     uid = str(message.chat.id)
     if os.path.exists(userFolderPath + '/' + uid):
         shutil.rmtree(userFolderPath+'/'+uid)
-        send_message(uid, "Авторизация очищена. Чтобы привязать данные авторизации используйте /auth")
+        send_message(uid, "Авторизация очищена. Чтобы привязать данные авторизации используйте /auth", message_thread_id=forum)
 
 
 @bot.message_handler(commands=['cancelauth'])
 def cancelauth(message):
+    forum = message.json['chat'].get("is_forum")
+    print("is forum:", forum)
+    if forum and message.message_thread_id is not None:
+        print("message_thread_id:", message.message_thread_id)
+        forum = message.message_thread_id
+
     uid = str(message.chat.id)
     UserInfo = ReadBotJson(uid)
     if UserInfo is not None:
         UserInfo['WaitForAuth'] = False
         SaveJSON(uid + '/botInfo.json', UserInfo)
-        send_message(uid, "Авторизация отменена. Чтобы привязать данные авторизации используйте /auth")
+        send_message(uid, "Авторизация отменена. Чтобы привязать данные авторизации используйте /auth", message_thread_id=forum)
 
 
 @bot.message_handler(commands=['auth'])
@@ -511,6 +529,14 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed'])
 def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
+    forum = message.json['chat'].get("is_forum")
+    print("is forum:", forum)
+    if forum and message.message_thread_id is not None:
+        #get forum id
+        print("message_thread_id:", message.message_thread_id)
+        forum = message.message_thread_id
+
+    print("forum: " + str(forum))
     if IsUserRegistered(uid):
 
         if isUserBanned(message.from_user.id):
@@ -525,7 +551,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
         global operationDay
         sended_msg = Sended
         if Relaunch == False:
-            sended_msg = send_message(uid, "Секунду, ищем расписание...", disable_notification=True)
+            sended_msg = send_message(uid, "Секунду, ищем расписание...", disable_notification=True, message_thread_id=forum)
 
         uiInfo = ReadBotJson(uid)
         expiration_timestamp = uiInfo.get('jwtExpiries')
@@ -609,14 +635,14 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 try:
                     bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
                 except:
-                    bot.send_message(message.chat.id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
+                    bot.send_message(message.chat.id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2', message_thread_id=forum)
             else:
                 ReAuthInSystem(message)
                 if not Relaunch:
                     bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     fetchDate(message, True, sended_msg)
                 else:
-                    bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
+                    bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2', message_thread_id=forum)
         else:
             ReAuthInSystem(message)
 
@@ -624,7 +650,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                 fetchDate(message, True, sended_msg)
             else:
-                bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2')
+                bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2', message_thread_id=forum)
 
 
 
@@ -883,13 +909,14 @@ def callback_ok(call):
     bot.answer_callback_query(callback_query_id=call.id, text="Пример текста", show_alert=True)
 
 
-def send_message(userId, msg, reply_markup=None, disable_notification=False):
+def send_message(userId, msg, reply_markup=None, disable_notification=False, message_thread_id=None):
     converted = telegramify_markdown.markdownify(
         msg,
         max_line_length=None,
-        normalize_whitespace=False
+        normalize_whitespace=False,
+
     )
-    return bot.send_message(userId, converted, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification)
+    return bot.send_message(userId, converted, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification, message_thread_id=message_thread_id)
 
 
 
