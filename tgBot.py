@@ -457,6 +457,7 @@ def exams(message):
 
     if isUserBanned(message.chat.id):
         send_message(message.chat.id, "idk", message_thread_id=forum)
+        return
 
     if IsUserRegistered(message.chat.id):
         userExams = get('https://msapi.top-academy.ru/api/v2/dashboard/info/future-exams', ReAuthInSystem(message))
