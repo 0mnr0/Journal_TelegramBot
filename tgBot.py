@@ -17,6 +17,13 @@ from telebot import types
 
 #Version 1.1
 
+
+def isForum(message):
+    forum = message.json['chat'].get("is_forum")
+    if forum and message.message_thread_id is not None:
+        forum = message.message_thread_id
+    return forum
+
 logFile = "botLogs.txt"
 
 if os.path.exists(logFile):
@@ -229,11 +236,7 @@ def UserRegister(userId, msgType):
 # Handle '/start' and '/help'
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    forum = message.json['chat'].get("is_forum")
-    print("is forum:", forum)
-    if forum and message.message_thread_id is not None:
-        print("message_thread_id:", message.message_thread_id)
-        forum = message.message_thread_id
+    forum = isForum(message)
 
     if UserRegister(message.chat.id, message.chat.type) == False:
         keyboard = types.InlineKeyboardMarkup()
@@ -264,25 +267,20 @@ def is_admin(chat_id):
 
 @bot.message_handler(commands=['clearauth'])
 def clearAuth(message):
-    forum = message.json['chat'].get("is_forum")
-    print("is forum:", forum)
-    if forum and message.message_thread_id is not None:
-        print("message_thread_id:", message.message_thread_id)
-        forum = message.message_thread_id
+    forum = isForum(message)
 
     uid = str(message.chat.id)
     if os.path.exists(userFolderPath + '/' + uid):
         shutil.rmtree(userFolderPath+'/'+uid)
-        send_message(uid, "Авторизация очищена. Чтобы привязать данные авторизации используйте /auth", message_thread_id=forum)
+        if isMessageFromGroup(message):
+            send_message(uid, "Авторизация очищена. Чтобы привязать данные авторизации используйте /auth", message_thread_id=forum, disable_notification=True)
+        else:
+            send_message(uid, "Авторизация очищена. Чтобы привязать данные авторизации используйте /auth", message_thread_id=forum)
 
 
 @bot.message_handler(commands=['cancelauth'])
 def cancelauth(message):
-    forum = message.json['chat'].get("is_forum")
-    print("is forum:", forum)
-    if forum and message.message_thread_id is not None:
-        print("message_thread_id:", message.message_thread_id)
-        forum = message.message_thread_id
+    forum = isForum(message)
 
     uid = str(message.chat.id)
     UserInfo = ReadBotJson(uid)
@@ -453,6 +451,29 @@ def ReAuthInSystem(message):
         bot.reply_to(message, "Для начала привяжите ваши данные в боте: /auth")
         return None
 
+@bot.message_handler(commands=['exams'])
+def exams(message):
+    forum = isForum(message)
+
+    if isUserBanned(message.chat.id):
+        send_message(message.chat.id, "idk", message_thread_id=forum)
+
+    if IsUserRegistered(message.chat.id):
+        userExams = get('https://msapi.top-academy.ru/api/v2/dashboard/info/future-exams', ReAuthInSystem(message))
+        userExams = userExams.json()
+        #[{'spec': 'Операционные системы и среды', 'date': '2024-12-13'}]
+
+        finalResponse = "Расписание экзаменов:\n\n"
+
+        if len(userExams) > 0:
+            for exam in userExams:
+                finalResponse += f">*{exam.get('date')}*:\n{exam.get('spec')}\n\n"
+        else:
+            finalResponse = "\n\n > Пусто"
+
+        send_message(message.chat.id, finalResponse, message_thread_id=forum)
+
+
 
 @bot.message_handler(commands=['passnotify'])
 def cancelNotify(message):
@@ -529,22 +550,15 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed'])
 def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
-    forum = message.json['chat'].get("is_forum")
-    print("is forum:", forum)
-    if forum and message.message_thread_id is not None:
-        #get forum id
-        print("message_thread_id:", message.message_thread_id)
-        forum = message.message_thread_id
+    forum = isForum(message)
 
-    print("forum: " + str(forum))
     if IsUserRegistered(uid):
 
         if isUserBanned(message.from_user.id):
             return
 
-        #if chat type not group
-        if not isMessageFromGroup(message):
-            bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👀')], is_big=False)
+
+        bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👀')], is_big=False)
 
 
         global showingText
