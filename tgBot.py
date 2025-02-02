@@ -658,7 +658,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     fetchDate(message, True, sended_msg)
                 else:
-                    bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2', message_thread_id=forum)
+                    send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом...", message_thread_id=forum)
         else:
             ReAuthInSystem(message)
 
@@ -666,7 +666,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                 fetchDate(message, True, sended_msg)
             else:
-                bot.send_message(message.chat.id, text="Не удалось загрузить расписание. Что-то с JWT ключом...", parse_mode='MarkdownV2', message_thread_id=forum)
+                send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом...", message_thread_id=forum)
 
 
 
