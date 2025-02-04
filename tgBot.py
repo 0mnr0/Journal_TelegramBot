@@ -556,7 +556,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
     forum = isForum(message)
 
-    if isFirstApril() or uid == '1903263685':
+    if isFirstApril():
         with open("EasterEggs/shedule_in_4k.jpg", "rb") as photo:
             bot.send_photo(
                 chat_id=message.chat.id,
