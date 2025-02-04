@@ -499,7 +499,9 @@ def whatTimeForBot(message):
     uid = str(message.chat.id)
     bot.send_message(uid, str(moscowTime.strftime("%H_%M")))
     timeCorrected = moscowTime+timedelta(hours=getGmtCorrection(uid))
-    bot.send_message(uid, str("With gmt correection\: "+timeCorrected.strftime("%H_%M")))
+    bot.send_message(uid, str("With gmt correction: "+timeCorrected.strftime("%H_%M")))
+
+
 
 
 @bot.message_handler(commands=['notifyme', 'notify'])
@@ -581,7 +583,7 @@ def setupGmtCorrection(message):
     if IsUserRegistered(message.from_user.id):
         msg = message.text.split(' ')
         if len(msg) != 2:
-            bot.reply_to(message, text=telegramify_markdown.markdownify("Для корректировки времени нужно выполнить комманду в формате:\n\n```/gmt +1```\nГде +1 - сдвиг на 1 час от GMT 0 (Например: Москва - GMT +3, Самара - GMT +4)"), parse_mode='MarkdownV2', message_thread_id=isForum(message))
+            bot.reply_to(message, text=telegramify_markdown.markdownify("Для корректировки времени нужно выполнить комманду в формате:\n\n```/gmt +1```\nГде +1 - сдвиг на 1 час от GMT 0 (Например: Москва - GMT +3, Самара - GMT +4).\n\nЧтобы узнать текущее время для бота, напишите ему команду:\n```/whatTimeForBot```"), parse_mode='MarkdownV2', message_thread_id=isForum(message))
             return
         gmtCorrection = msg[1]
         gmtCorrection = gmtCorrection.replace('+', '')
