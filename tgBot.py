@@ -1,4 +1,5 @@
 import random
+from email import message_from_string
 from threading import *
 
 from cffi.model import char_array_type
@@ -46,13 +47,12 @@ API_TOKEN = open('tkn.ini', 'r').read()
 bot = telebot.TeleBot(API_TOKEN)
 logger = logging.getLogger('TeleBot').setLevel(logging.INFO)
 
-hoursCalibration = 4
 
-moscowTime = datetime.now()+timedelta(hours=hoursCalibration)
+moscowTime = datetime.now()
 
 def reInitTime():
     global moscowTime
-    moscowTime = datetime.now()+timedelta(hours=hoursCalibration)
+    moscowTime = datetime.now()
 
 
 def CreateFolderIfNotExists(path):
@@ -478,7 +478,14 @@ def exams(message):
 
         send_message(message.chat.id, finalResponse, message_thread_id=forum)
 
-
+def getGmtCorrection(uid):
+    botInfo = ReadBotJson(uid)
+    if IsUserRegistered(uid):
+        if botInfo.get('gmtCorrection') is None:
+            return 0
+        else:
+            return botInfo.get('gmtCorrection')
+    return 0
 
 @bot.message_handler(commands=['passnotify'])
 def cancelNotify(message):
@@ -491,6 +498,8 @@ def cancelNotify(message):
 def whatTimeForBot(message):
     uid = str(message.chat.id)
     bot.send_message(uid, str(moscowTime.strftime("%H_%M")))
+    timeCorrected = moscowTime+timedelta(hours=getGmtCorrection(uid))
+    bot.send_message(uid, str("With gmt correection\: "+timeCorrected.strftime("%H_%M")))
 
 
 @bot.message_handler(commands=['notifyme', 'notify'])
@@ -564,6 +573,31 @@ def isFirstApril():
 
 def ThreePercentChance():
     return random.randint(1, 100) <= 3
+
+
+@bot.message_handler(commands=['gmt'])
+def setupGmtCorrection(message):
+    uid = str(message.chat.id)
+    if IsUserRegistered(message.from_user.id):
+        msg = message.text.split(' ')
+        if len(msg) != 2:
+            bot.reply_to(message, text=telegramify_markdown.markdownify("Для корректировки времени нужно выполнить комманду в формате:\n\n```/gmt +1```\nГде +1 - сдвиг на 1 час от GMT 0 (Например: Москва - GMT +3, Самара - GMT +4)"), parse_mode='MarkdownV2', message_thread_id=isForum(message))
+            return
+        gmtCorrection = msg[1]
+        gmtCorrection = gmtCorrection.replace('+', '')
+        if not gmtCorrection.isdigit() and '-' not in gmtCorrection:
+            bot.reply_to(message, text=telegramify_markdown.markdownify("Введенное значение должно быть числом! (Положительным, отрицательным или нулевым)"), parse_mode='MarkdownV2', message_thread_id=isForum(message))
+            return
+        gmtCorrection = int(gmtCorrection)
+        botInfo = ReadBotJson(uid)
+        botInfo['gmtCorrection'] = gmtCorrection
+        if gmtCorrection == 0:
+            botInfo['gmtCorrection'] = None
+        SaveJSON(uid + '/botInfo.json', botInfo)
+        bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👍')], is_big=False)
+    else:
+        bot.send_message(message.chat.id, text=telegramify_markdown.markdownify("Вы не зарегистрированы!"), parse_mode='MarkdownV2', message_thread_id=isForum(message))
+
 
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed', 'Пары', 'ПАРЫ'])
 def fetchDate(message, Relaunch=False, Sended=None):
@@ -639,6 +673,8 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 operationDay = datetime.today() - timedelta(days=int(dayNum))
                 showingText = operationDay.strftime('%Y-%m-%d')
 
+
+        operationDay = operationDay + timedelta(hours=getGmtCorrection(uid))
         if "послезавтра" in message.text.lower():
             operationDay = operationDay+timedelta(days=2)
             showingText = f"послезавтра ({operationDay.strftime('%Y-%m-%d')})"
@@ -663,7 +699,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
             # Example of url by finding a day:
             #https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
 
-
+            operationDay = operationDay
             fetchResult = get(basicUrl+operationDay, lastJwt)
             if fetchResult.status_code == 200:
                 jsonResult = fetchResult.json()
