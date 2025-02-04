@@ -1,4 +1,7 @@
+import random
 from threading import *
+
+from cffi.model import char_array_type
 from telebot.types import ReactionTypeEmoji
 import telegramify_markdown
 from telegramify_markdown import customize
@@ -547,9 +550,20 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
             else:
                 bot.send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent, parse_mode='MarkdownV2')
 
+def ClearCachedJWT(uid):
+    if IsUserRegistered(uid):
+        BotInfo = open('userInfo/' + uid + '/botInfo.json', 'r+', encoding='utf-8')
+        userInfo = json.load(BotInfo)
+        userInfo['jwtToken'] = None
+        userInfo['jwtExpiries'] = None
+        SaveJSON(uid + '/botInfo.json', userInfo)
+
 
 def isFirstApril():
     return datetime.today().month == 4 and datetime.today().day == 1
+
+def ThreePercentChance():
+    return random.randint(1, 100) <= 3
 
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed', 'Пары', 'ПАРЫ'])
 def fetchDate(message, Relaunch=False, Sended=None):
@@ -565,7 +579,21 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 message_thread_id=forum,
                 reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
             )
-        time.sleep(5)
+        time.sleep(7)
+    else:
+        if ThreePercentChance():
+            with open("EasterEggs/walter_black.jpg", "rb") as photo:
+                bot.send_photo(
+                    chat_id=message.chat.id,
+                    photo=photo,
+                    caption="Nuh, i dont want to do it",
+                    message_thread_id=forum,
+                    reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
+                )
+            time.sleep(5)
+
+
+
 
     if IsUserRegistered(uid):
 
@@ -588,6 +616,9 @@ def fetchDate(message, Relaunch=False, Sended=None):
         basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
         operationDay = datetime.today()
         showingText = "сегодня"
+
+        if lastJwt is None or expiration_timestamp is None:
+            ReAuthInSystem(message)
 
         if strClear(message.text).isdigit():
             try:
@@ -627,7 +658,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
         if expiration_timestamp is None:
             expiration_timestamp = time.time()+10
 
-        if time.time() < expiration_timestamp:
+        if time.time() < expiration_timestamp and lastJwt is not None:
             #JWT Key Is Still Valid
             # Example of url by finding a day:
             #https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
@@ -667,16 +698,15 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 except:
                     bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum)
             else:
-                ReAuthInSystem(message)
                 if not Relaunch:
+                    ClearCachedJWT(uid)
                     bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     fetchDate(message, True, sended_msg)
                 else:
                     send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом...", message_thread_id=forum)
         else:
-            ReAuthInSystem(message)
-
             if not Relaunch:
+                ClearCachedJWT(uid)
                 bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                 fetchDate(message, True, sended_msg)
             else:
