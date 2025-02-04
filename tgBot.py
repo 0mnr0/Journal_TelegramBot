@@ -548,11 +548,24 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
                 bot.send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent, parse_mode='MarkdownV2')
 
 
+def isFirstApril():
+    return datetime.today().month == 4 and datetime.today().day == 1
 
-@bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed'])
+@bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed', 'Пары', 'ПАРЫ'])
 def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
     forum = isForum(message)
+
+    if isFirstApril() or uid == '1903263685':
+        with open("EasterEggs/shedule_in_4k.jpg", "rb") as photo:
+            bot.send_photo(
+                chat_id=message.chat.id,
+                photo=photo,
+                caption="Вот расписание на указанный день!",
+                message_thread_id=forum,
+                reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
+            )
+        time.sleep(5)
 
     if IsUserRegistered(uid):
 
@@ -566,7 +579,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
         global showingText
         global operationDay
         sended_msg = Sended
-        if Relaunch == False:
+        if not Relaunch:
             sended_msg = send_message(uid, "Секунду, ищем расписание...", disable_notification=True, message_thread_id=forum)
 
         uiInfo = ReadBotJson(uid)
@@ -596,14 +609,15 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 showingText = operationDay.strftime('%Y-%m-%d')
 
         if "послезавтра" in message.text.lower():
-            showingText = "послезавтра"
             operationDay = operationDay+timedelta(days=2)
-        elif "завтра" in message.text.lower():
-            showingText = "завтра"
+            showingText = f"послезавтра ({operationDay.strftime('%Y-%m-%d')})"
+        elif "завтра" in message.text.lower() or "завтрв" in message.text.lower():
             operationDay = operationDay + timedelta(days=1)
+            showingText = f"завтра ({operationDay.strftime('%Y-%m-%d')})"
         elif "вчера" in message.text.lower():
-            showingText = "вчера"
             operationDay = operationDay-timedelta(days=1)
+            showingText = f"вчера ({operationDay.strftime('%Y-%m-%d')})"
+
 
 
         if type(operationDay) != str:
@@ -642,16 +656,16 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 if len(finalText) == 0:
                     finalText="В этот день ничего нет :D"
 
+                finalText = "Пары на *" + showingText + "*:\n\n" + finalText
                 converted = telegramify_markdown.markdownify(
                     finalText,
                     max_line_length=None,
                     normalize_whitespace=False
                 )
-                showingText = showingText.replace("-", "\\-")
                 try:
-                    bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2')
+                    bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=converted, parse_mode='MarkdownV2')
                 except:
-                    bot.send_message(message.chat.id, text="Пары на *" + showingText + "*:\n\n" + converted, parse_mode='MarkdownV2', message_thread_id=forum)
+                    bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum)
             else:
                 ReAuthInSystem(message)
                 if not Relaunch:
