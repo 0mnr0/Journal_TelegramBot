@@ -1,8 +1,6 @@
 import random
-from email import message_from_string
 from threading import *
 
-from cffi.model import char_array_type
 from telebot.types import ReactionTypeEmoji
 import telegramify_markdown
 from telegramify_markdown import customize
@@ -357,7 +355,7 @@ def SaveUseTextContext(uid, value):
     botInfo["UseTextConfig"] = value
     SaveJSON(str(uid) + '/botInfo.json', botInfo)
 
-@bot.message_handler(commands=["chatContext"])
+@bot.message_handler(commands=["chatContext", "chatcontext"])
 def send_toggle_button(message):
     config = GetUseTextContext(message.chat.id)
     markup = telebot.types.InlineKeyboardMarkup()
@@ -545,7 +543,7 @@ def cancelNotify(message):
     cleanNotifyList(uid)
 
 
-@bot.message_handler(commands=['whatTimeForBot'])
+@bot.message_handler(commands=['whatTimeForBot', 'whattimeforbot'])
 def whatTimeForBot(message):
     uid = str(message.chat.id)
     bot.send_message(uid, str(moscowTime.strftime("%H_%M")))
