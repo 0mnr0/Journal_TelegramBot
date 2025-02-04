@@ -343,6 +343,54 @@ def auth_callback(call):
     chat_id = data[1]
     makeAuth(chat_id, True)
 
+
+def GetUseTextContext(uid):
+    botInfo = ReadBotJson(uid)
+    if botInfo.get("UseTextConfig") is None:
+        return False
+    else:
+        return botInfo.get("UseTextConfig")
+
+
+def SaveUseTextContext(uid, value):
+    botInfo = ReadBotJson(uid)
+    botInfo["UseTextConfig"] = value
+    SaveJSON(str(uid) + '/botInfo.json', botInfo)
+
+@bot.message_handler(commands=["chatContext"])
+def send_toggle_button(message):
+    config = GetUseTextContext(message.chat.id)
+    markup = telebot.types.InlineKeyboardMarkup()
+    btn_text = f'Включить / отключить'
+    markup.add(telebot.types.InlineKeyboardButton(btn_text, callback_data="toggleTextContext"))
+    yesAwnser = "*Да*\n\nБот будет присылать расписание даже без команды.\nНапример: какие сегодня *пары*?"
+    noAwnser = "*Нет*\n\nБот не покажет расписание без команды.\nПример: какие сегодня *пары*? - не сработает\nПример: какие сегодня *!пары*? - сработает"
+    bot.send_message(message.chat.id, telegramify_markdown.markdownify(f'Использовать текст в сообщении для активации бота: {yesAwnser if config == True else noAwnser}'), reply_markup=markup, parse_mode="MarkdownV2")
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "toggleTextContext")
+def toggle_config(call):
+    uid = call.message.chat.id
+    current_value = GetUseTextContext(uid)
+    new_value = not current_value
+
+    SaveUseTextContext(uid, new_value)
+
+    btn_text = "Включить / отключить"
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.add(telebot.types.InlineKeyboardButton(btn_text, callback_data="toggleTextContext"))
+
+    yesAwnser = "*Да*\n\nБот будет присылать расписание даже без команды.\nНапример: какие сегодня *пары*?"
+    noAwnser = "*Нет*\n\nБот не покажет расписание без команды.\nПример: какие сегодня *пары*? - не сработает\nПример: какие сегодня *!пары*? - сработает"
+    new_text = f'Использовать текст в сообщении для активации бота: {yesAwnser if new_value == True else noAwnser}'
+
+    bot.edit_message_text(chat_id=call.message.chat.id,
+                          message_id=call.message.message_id,
+                          text=telegramify_markdown.markdownify(new_text),
+                          reply_markup=markup,
+                          parse_mode="MarkdownV2")
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("groupAuth"))
 def groupauth_callback(call):
     bot.answer_callback_query(call.id)
@@ -996,8 +1044,10 @@ def echo_message(message):
 
     elif IsUserRegistered(uid) and not ui.get('WaitForAuth'):
         if True:
-            if '!пары' in message.text.lower() or '!gfhs' in message.text.lower() or '!расписание' in message.text.lower():
+            if '!пары' in message.text.lower() or '!gfhs' in message.text.lower() or '!расписание' in message.text.lower() or (GetUseTextContext(message.chat.id) and 'пары' in message.text.lower()):
                 fetchDate(message)
+
+
 
 
 
