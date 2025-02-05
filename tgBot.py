@@ -173,7 +173,6 @@ def backgroundSend():
             global alreadyNotified
             reInitTime()
             mscTime = moscowTime.strftime("%H:%M")
-            print("currentTime: " + mscTime)
             maxLengthOfUsers = get_count_users_in_time(mscTime)
 
             usersToNotify = get_users_by_notification_time(mscTime)
