@@ -622,7 +622,7 @@ def isFirstApril():
     return datetime.today().month == 4 and datetime.today().day == 1
 
 def ThreePercentChance():
-    return random.randint(1, 100) <= 5
+    return random.randint(1, 100) <= 3
 
 
 @bot.message_handler(commands=['gmt'])
