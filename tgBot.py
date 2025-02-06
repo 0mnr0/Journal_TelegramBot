@@ -967,6 +967,7 @@ def echo_message(message):
         send_welcome(message)
         return
 
+    ReAuthInSystem(message)
     ui = ReadBotJson(uid)
 
     if ui.get('notifySetup'):
