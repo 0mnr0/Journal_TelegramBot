@@ -527,13 +527,17 @@ def exams(message):
         send_message(message.chat.id, finalResponse, message_thread_id=forum)
 
 def getGmtCorrection(uid):
-    botInfo = ReadBotJson(uid)
-    if IsUserRegistered(uid):
-        if botInfo.get('gmtCorrection') is None:
-            return 0
-        else:
-            return botInfo.get('gmtCorrection')
-    return 0
+    try:
+        botInfo = ReadBotJson(uid)
+        if IsUserRegistered(uid):
+
+            if botInfo.get('gmtCorrection') is None:
+                return 0
+            else:
+                return botInfo.get('gmtCorrection')
+        return 0
+    except:
+        return 0
 
 @bot.message_handler(commands=['passnotify'])
 def cancelNotify(message):
@@ -971,6 +975,7 @@ def echo_message(message):
         args = text.split(" ")
         userTime = args[0].replace(' ','').replace('silent','').replace('.',':').replace('_',':')
 
+        userTime = (datetime.strptime(userTime, "%H:%M") + timedelta(hours=getGmtCorrection(uid))).strftime("%H:%M")
         if is_valid_time(userTime):
             ###
             cleanNotifyList(uid)
