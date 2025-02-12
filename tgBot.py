@@ -580,9 +580,9 @@ def cancelNotify(message):
 @bot.message_handler(commands=['whatTimeForBot', 'whattimeforbot'])
 def whatTimeForBot(message):
     uid = str(message.chat.id)
-    bot.send_message(uid, str(moscowTime.strftime("%H_%M")))
+    bot.send_message(uid, str("Время для бота: "+moscowTime.strftime("%H:%M")))
     timeCorrected = moscowTime + timedelta(hours=getGmtCorrection(uid))
-    bot.send_message(uid, str("With gmt correction: " + timeCorrected.strftime("%H_%M")))
+    bot.send_message(uid, str("Время с поправкой на ваш регион: " + timeCorrected.strftime("%H:%M")))
 
 
 @bot.message_handler(commands=['notifyme', 'notify'])
@@ -594,6 +594,7 @@ def notifier(message):
 Вы также можете дополнить сообщение если нужно получить расписание на следющий день, например: */notify 23:00 1*\n
 Единица в команде указывает кол-во сдвигов по дням, то есть если указать 1 то бот пришлёт расписание на следующий день.\n
 \nВы так-же можете дописать *silent* к вашей команде что заставит бота отправлять расписание "без звука" *Примеры*: ``` 23:00 1 silent```\n``` 10.00 silent``` 
+(Настроить часовой пояс можно через команду /gmt)
 """)
     SetWaitForNotify(uid, True)
 
@@ -662,7 +663,7 @@ def setupGmtCorrection(message):
         msg = message.text.split(' ')
         if len(msg) != 2:
             bot.reply_to(message, text=telegramify_markdown.markdownify(
-                "Для корректировки времени нужно выполнить комманду в формате:\n\n```/gmt +1```\nГде +1 - сдвиг на 1 час от GMT 0 (Например: Москва - GMT +3, Самара - GMT +4).\n\nЧтобы узнать текущее время для бота, напишите ему команду:\n```/whatTimeForBot```"),
+                "Для корректировки времени нужно выполнить комманду в формате:\n\n```/gmt +1```\nГде +1 - сдвиг на 1 час относительно бота (Например: Москва +2 | Самара +1).\n\nЧтобы узнать текущее время для бота, напишите ему команду: /whatTimeForBot"),
                          parse_mode='MarkdownV2', message_thread_id=isForum(message))
             return
         gmtCorrection = msg[1]
@@ -1006,12 +1007,18 @@ def echo_message(message):
         SetWaitForLoginData(uid, False)
         args = text.split(" ")
         userTime = args[0].replace(' ', '').replace('silent', '').replace('.', ':').replace('_', ':')
+        OrigUserTime = userTime
 
-        userTime = (datetime.strptime(userTime, "%H:%M") + timedelta(hours=getGmtCorrection(uid))).strftime("%H:%M")
+        if getGmtCorrection(uid) < 0:
+            userTime = (datetime.strptime(userTime, "%H:%M") + timedelta(hours=getGmtCorrection(uid))).strftime("%H:%M")
+        else:
+            userTime = (datetime.strptime(userTime, "%H:%M") - timedelta(hours=getGmtCorrection(uid))).strftime("%H:%M")
+
         if is_valid_time(userTime):
             ###
             cleanNotifyList(uid)
-            send_message(uid, "Уведомления успешно активированы. Время уведомлений: " + userTime)
+            send_message(uid, f"""Уведомления успешно активированы. Время уведомлений (для бота): {userTime}
+Время уведомления с учётом сдвига времени: {OrigUserTime}""")
 
             userBotInfo = ReadJSON(uid + '/botInfo.json')
             additionalDay = 0
