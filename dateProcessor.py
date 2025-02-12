@@ -13,10 +13,12 @@ def isItPlusOperation(txt):
 
 def getTextOperation(txt):
     first_part, second_part = txt.split(' ', 1)
+    # Replace all without nums
     command = (second_part.replace(' ','')) [0]
     action = (second_part.replace(' ',''))[1:]
     if command == '+' or command == '-':
         action = action.replace('+','').replace('-','')
+        action = re.findall("\d+", action)[0]
         return command, action
 
 
