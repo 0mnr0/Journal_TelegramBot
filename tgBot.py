@@ -772,6 +772,8 @@ def fetchDate(message):
             showingText = "вчера"
             operationDay = operationDay - timedelta(days=1)
 
+        operationDay = operationDay + timedelta(hours=getGmtCorrection(uid))
+
         if type(operationDay) != str:
             operationDay = operationDay.strftime('%Y-%m-%d')
 
