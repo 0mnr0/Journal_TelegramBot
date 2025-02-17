@@ -770,12 +770,17 @@ def DynamicMessage(message):
             DBMessages.UnRegisterMessageReloader(DynamicChatID)
         except: print("Failed to delete dynamic message")
 
-    Message = bot.send_message(uid, text=ShedForDay, message_thread_id=forum, reply_markup=get_keyboard(), parse_mode="MarkdownV2", disable_notification=True)
-    DynamicChatMessage, botin['DynamicID'] = 2 * [Message.message_id]
+    BotMessage = bot.send_message(uid, text=ShedForDay, message_thread_id=forum, reply_markup=get_keyboard(), parse_mode="MarkdownV2", disable_notification=True)
+    DynamicChatMessage, botin['DynamicID'] = 2 * [BotMessage.message_id]
     DynamicChatID, botin['DynamicChatID'] = 2 * [uid]
     DynamicForumID, botin['DynamicForumID'] = 2 * [forum]
     SaveJSON(uid+'/botInfo.json', botin)
     DBMessages.RegisterMessageReloader(DynamicChatID, DynamicChatMessage, userInitCmd, getGmtCorrection(userInitCmd))
+
+    try:
+        bot.delete_message(uid, message.message_id)
+    except:
+        pass
 
 
 
