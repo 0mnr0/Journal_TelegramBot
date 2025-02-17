@@ -192,7 +192,7 @@ def RefreshAdaptiveMessage():
                 ChatID = message.get('chatId')
                 uid = message.get('messageId')
                 LinkedPerson = message.get('connectedFrom')
-                NewShedTimeText = f"ChangeTime\: *{datetime.now().strftime('%H:%M:%S')}*\n" + GetShedForTime(day=None, uid=str(LinkedPerson), NeedReAuth=True, tomorrow = False, secondsClarify=True)
+                NewShedTimeText = GetShedForTime(day=None, uid=str(LinkedPerson), NeedReAuth=True, tomorrow = False, secondsClarify=True)
                 try:
                     bot.edit_message_text(chat_id=ChatID, message_id=uid, text=NewShedTimeText, parse_mode="MarkdownV2", reply_markup=get_keyboard())
                 except Exception as e:
