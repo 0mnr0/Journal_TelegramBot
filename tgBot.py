@@ -1,7 +1,7 @@
 import random
 from threading import *
 
-from telebot.types import ReactionTypeEmoji
+from telebot.types import ReactionTypeEmoji, InlineKeyboardButton, InlineKeyboardMarkup
 import telegramify_markdown
 from telegramify_markdown import customize
 from dateProcessor import *
@@ -17,7 +17,33 @@ import shutil
 from telebot import types
 
 
-# Version 1.1
+#Version 1.1
+
+
+AdaptiveSchedule = db['AdaptiveSchedule']
+class DBMessages: # MongoDB
+    @staticmethod
+    def RegisterMessageReloader(chatId, messageId, connectedFrom, gmtCorrection=0):
+        AdaptiveSchedule.update_one({'chatId': chatId}, {'$set': {'messageId': messageId, 'gmtCorrection': gmtCorrection, 'connectedFrom': connectedFrom }}, upsert=True)
+
+    @staticmethod
+    def UnRegisterMessageReloader(chatId):
+        AdaptiveSchedule.delete_one({'chatId': chatId})
+
+    @staticmethod
+    def GetAllMessagesById(chatId):
+        return AdaptiveSchedule.find({'chatId': chatId})
+
+    @staticmethod
+    def GetAllMessages():
+        return AdaptiveSchedule.find()
+
+    @staticmethod
+    def ChangeGMT(connectedFrom, gmtValue):
+        #Can Be Not One Only
+        AdaptiveSchedule.update_many({'connectedFrom': connectedFrom}, {'$set': {'gmtCorrection': gmtValue}})
+
+
 
 
 def isForum(message):
@@ -25,7 +51,6 @@ def isForum(message):
     if forum and message.message_thread_id is not None:
         forum = message.message_thread_id
     return forum
-
 
 logFile = "botLogs.txt"
 
@@ -35,9 +60,9 @@ if os.path.exists(logFile):
 # Настройка логирования
 logging.basicConfig(
     filename=logFile,
-    level=logging.DEBUG,  # Уровень логирования (DEBUG для записи всех событий)
+    level=logging.DEBUG,          # Уровень логирования (DEBUG для записи всех событий)
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Формат сообщения
-    datefmt='%Y-%m-%d %H:%M:%S'  # Формат времени
+    datefmt='%Y-%m-%d %H:%M:%S'   # Формат времени
 )
 
 userFolderPath = 'userInfo'
@@ -46,8 +71,8 @@ API_TOKEN = open('tkn.ini', 'r').read()
 bot = telebot.TeleBot(API_TOKEN)
 logger = logging.getLogger('TeleBot').setLevel(logging.INFO)
 
-moscowTime = datetime.now()
 
+moscowTime = datetime.now()
 
 def reInitTime():
     global moscowTime
@@ -60,13 +85,11 @@ def CreateFolderIfNotExists(path):
 
 
 CreateFolderIfNotExists(userFolderPath)
-CreateFolderIfNotExists(userFolderPath + '/notifyList')
-
+CreateFolderIfNotExists(userFolderPath+'/notifyList')
 
 def IsUserExists(userId):
     userId = str(userId)
     return os.path.exists(userFolderPath + '/' + userId)
-
 
 def ReadBotJson(userId):
     if IsUserExists(userId):
@@ -89,43 +112,37 @@ def SaveJSON(pathToJson, savingJSON):
     with open(pathToJson, 'w', encoding='utf-8') as f:
         json.dump(savingJSON, f, ensure_ascii=False, indent=4)
 
-
 def CreateFile(pathToFile, text=None):
     pathToFile = userFolderPath + '/' + pathToFile
     with open(pathToFile, 'w', encoding='utf-8') as f:
         if text is not None:
             f.write(text)
 
-
 def SaveFile(pathToFile, text):
     pathToFile = userFolderPath + '/' + pathToFile
     with open(pathToFile, 'w', encoding='utf-8') as f:
         f.write(text)
-
 
 def SaveFileByList(pathToFile, list):
     pathToFile = userFolderPath + '/' + pathToFile
     with open(pathToFile, 'w', encoding='utf-8') as f:
         for item in list:
             if item != '':
-                # If last line then no append \n
+                #If last line then no append \n
                 if item == list[-1]:
                     f.write(item)
                 else:
                     f.write(item + '\n')
-
 
 def ReadFile(pathToFile):
     pathToFile = userFolderPath + '/' + pathToFile
     with open(pathToFile, 'r', encoding='utf-8') as f:
         return f.read()
 
-
 def AppendToFile(pathToFile, text):
     pathToFile = userFolderPath + '/' + pathToFile
     with open(pathToFile, 'a', encoding='utf-8') as f:
         f.write(text)
-
 
 def IsUserRegistered(userId):
     if IsUserExists(userId):
@@ -137,13 +154,11 @@ def IsUserRegistered(userId):
     else:
         return False
 
-
 def SetWaitForLoginData(userId, state):
     userId = str(userId)
     reg = ReadBotJson(userId)
     reg['WaitForAuth'] = state
     SaveJSON(userId + '/botInfo.json', reg)
-
 
 def SetWaitForNotify(userId, state):
     userId = str(userId)
@@ -151,14 +166,11 @@ def SetWaitForNotify(userId, state):
     reg['notifySetup'] = state
     SaveJSON(userId + '/botInfo.json', reg)
 
-
 def dictToJson(d):
     return json.dumps(d)
 
-
 def isMessageFromGroup(msg):
     return msg.chat.type != 'private'
-
 
 def isUserBanned(userId):
     if IsUserExists(userId):
@@ -169,21 +181,50 @@ def isUserBanned(userId):
         return False
 
 
-def cleanNotifyList(uid):
-    for time in os.listdir(userFolderPath + '/notifyList/'):
-        for userId in os.listdir(userFolderPath + '/notifyList/' + time):
-            if userId == uid:
-                os.rmdir(userFolderPath + '/notifyList/' + time + '/' + userId)
-                send_message(uid, "*Notifier*: \nУведомления для времени \"" + time.replace("_", ":") + "\" отключены",
-                             disable_notification=True)
+def RefreshAdaptiveMessage():
+    while True:
+        time.sleep(5)
+        #Get Minute Of Current Time
+        minute = (datetime.now().minute % 30) == 0
+        if minute:
+            WhatToRefresh = DBMessages.GetAllMessages()
+            for message in WhatToRefresh:
+                ChatID = message.get('chatId')
+                uid = message.get('messageId')
+                LinkedPerson = message.get('connectedFrom')
+                NewShedTimeText = f"ChangeTime\: *{datetime.now().strftime('%H:%M:%S')}*\n" + GetShedForTime(day=None, uid=str(LinkedPerson), NeedReAuth=True, tomorrow = False, secondsClarify=True)
+                try:
+                    bot.edit_message_text(chat_id=ChatID, message_id=uid, text=NewShedTimeText, parse_mode="MarkdownV2", reply_markup=get_keyboard())
+                except Exception as e:
+                    print(e)
 
+
+AdaptiveChanges = Thread(target=RefreshAdaptiveMessage)
+AdaptiveChanges.start()
+
+
+
+
+
+
+
+
+
+
+
+def cleanNotifyList(uid):
+    for time in os.listdir(userFolderPath+'/notifyList/'):
+        for userId in os.listdir(userFolderPath+'/notifyList/'+time):
+            if userId == uid:
+                os.rmdir(userFolderPath+'/notifyList/'+time+'/'+userId)
+                send_message(uid, "*Notifier*: \nУведомления для времени \""+time.replace("_",":")+"\" отключены", disable_notification=True)
 
 lastTimeSended = None
 alreadyNotified = []
 maxLengthOfUsers = 0
-
-
 def backgroundSend():
+
+
     global lastTimeSended
     while True:
         try:
@@ -199,6 +240,7 @@ def backgroundSend():
                     alreadyNotified = []
                 lastTimeSended = mscTime
 
+
                 if len(usersToNotify) > 0:
                     for userData in usersToNotify:
                         if userData.get('uid') in alreadyNotified:
@@ -208,8 +250,7 @@ def backgroundSend():
                         userDayMovement = userData.get('additionalDay')
                         userDaySilent = userData.get('is_silent')
                         tkn = EaseAuth(uid)
-                        notifyForUser = Thread(target=sheduleNotifySender,
-                                               args=(uid, tkn, userDayMovement, userDaySilent))
+                        notifyForUser = Thread(target=sheduleNotifySender, args=(uid, tkn, userDayMovement, userDaySilent))
                         notifyForUser.start()
                         alreadyNotified.append(uid)
 
@@ -225,6 +266,8 @@ def backgroundSend():
 
 notifier = Thread(target=backgroundSend)
 notifier.start()
+
+
 
 
 def UserRegister(userId, msgType):
@@ -247,6 +290,7 @@ def UserRegister(userId, msgType):
     return UserAuthed
 
 
+
 # Handle '/start' and '/help'
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -259,23 +303,19 @@ def send_welcome(message):
             auth_button = types.InlineKeyboardButton(text="Авторизоваться", callback_data=f"auth:{message.chat.id}")
             keyboard.add(auth_button)
             bot.send_message(message.chat.id,
-                             text="Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте.",
-                             reply_markup=keyboard, message_thread_id=forum)
+                text="Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте.",
+                reply_markup=keyboard, message_thread_id=forum)
         else:
 
-            additionalText = '\n\nID Группы: `' + str(
-                message.chat.id) + '`.\nЗапомните ID выше и нажмите кнопку ниже, чтобы авторизовать бота в группе через личные сообщения (Обычная авторизация в группе недоступна из-за соображений безопасности).'
+
+            additionalText = '\n\nID Группы: `'+str(message.chat.id)+'`.\nЗапомните ID выше и нажмите кнопку ниже, чтобы авторизовать бота в группе через личные сообщения (Обычная авторизация в группе недоступна из-за соображений безопасности).'
             send_message(message.chat.id,
-                         "Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте. " + additionalText,
-                         message_thread_id=forum)
+                         "Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте. " + additionalText, message_thread_id=forum)
 
             keyboard = types.InlineKeyboardMarkup()
-            auth_button = types.InlineKeyboardButton(text="Авторизовать группу",
-                                                     callback_data=f"groupAuth:{message.chat.id}")
+            auth_button = types.InlineKeyboardButton(text="Авторизовать группу", callback_data=f"groupAuth:{message.chat.id}")
             keyboard.add(auth_button)
-            send_message(message.chat.id,
-                         "*Для нормальной работы бота выдайте ему роль администраотра*\n*Для того чтобы кнопка работала напишите ему в личные сообщения*\n\nАвторизация не доступна в группе. Используйте кнопку ниже для привязки аккаунту к группе:",
-                         reply_markup=keyboard, message_thread_id=forum)
+            send_message(message.chat.id, "*Для нормальной работы бота выдайте ему роль администраотра*\n*Для того чтобы кнопка работала напишите ему в личные сообщения*\n\nАвторизация не доступна в группе. Используйте кнопку ниже для привязки аккаунту к группе:", reply_markup=keyboard, message_thread_id=forum)
 
 
 # Функция для проверки прав администратора
@@ -283,20 +323,17 @@ def is_admin(chat_id):
     member = bot.get_chat_member(chat_id, bot.get_me().id)
     return member.status in ['administrator', 'creator']
 
-
 @bot.message_handler(commands=['clearauth'])
 def clearAuth(message):
     forum = isForum(message)
 
     uid = str(message.chat.id)
     if os.path.exists(userFolderPath + '/' + uid):
-        shutil.rmtree(userFolderPath + '/' + uid)
+        shutil.rmtree(userFolderPath+'/'+uid)
         if isMessageFromGroup(message):
-            send_message(uid, "Авторизация очищена. Чтобы привязать данные авторизации используйте /auth",
-                         message_thread_id=forum, disable_notification=True)
+            send_message(uid, "Авторизация очищена. Чтобы привязать данные авторизации используйте /auth", message_thread_id=forum, disable_notification=True)
         else:
-            send_message(uid, "Авторизация очищена. Чтобы привязать данные авторизации используйте /auth",
-                         message_thread_id=forum)
+            send_message(uid, "Авторизация очищена. Чтобы привязать данные авторизации используйте /auth", message_thread_id=forum)
 
 
 @bot.message_handler(commands=['cancelauth'])
@@ -308,13 +345,15 @@ def cancelauth(message):
     if UserInfo is not None:
         UserInfo['WaitForAuth'] = False
         SaveJSON(uid + '/botInfo.json', UserInfo)
-        send_message(uid, "Авторизация отменена. Чтобы привязать данные авторизации используйте /auth",
-                     message_thread_id=forum)
+        send_message(uid, "Авторизация отменена. Чтобы привязать данные авторизации используйте /auth", message_thread_id=forum)
 
 
 @bot.message_handler(commands=['auth'])
 def makeAuth(message, messageIsAnId=False):
-    if messageIsAnId == False and isMessageFromGroup(message):
+
+
+
+    if messageIsAnId==False and isMessageFromGroup(message):
         if isUserBanned(message):
             send_message(message.chat.id, "\{ banned: true \}")
             return
@@ -323,9 +362,9 @@ def makeAuth(message, messageIsAnId=False):
             send_welcome(message)
             return
         else:
-            send_message(message.chat.id,
-                         "Группа уже имеет данные авторизации. Вы можете авторизоваться заново используя /clearauth а затем /auth.")
+            send_message(message.chat.id, "Группа уже имеет данные авторизации. Вы можете авторизоваться заново используя /clearauth а затем /auth.")
             return
+
 
     user = message
     if type(message) is int:
@@ -373,7 +412,6 @@ def SaveUseTextContext(uid, value):
     botInfo["UseTextConfig"] = value
     SaveJSON(str(uid) + '/botInfo.json', botInfo)
 
-
 @bot.message_handler(commands=["chatContext", "chatcontext"])
 def send_toggle_button(message):
     config = GetUseTextContext(message.chat.id)
@@ -382,9 +420,7 @@ def send_toggle_button(message):
     markup.add(telebot.types.InlineKeyboardButton(btn_text, callback_data="toggleTextContext"))
     yesAwnser = "*Да*\n\nБот будет присылать расписание даже без команды.\nНапример: какие сегодня *пары*?"
     noAwnser = "*Нет*\n\nБот не покажет расписание без команды.\nПример: какие сегодня *пары*? - не сработает\nПример: какие сегодня *!пары*? - сработает"
-    bot.send_message(message.chat.id, telegramify_markdown.markdownify(
-        f'Использовать текст в сообщении для активации бота: {yesAwnser if config == True else noAwnser}'),
-                     reply_markup=markup, parse_mode="MarkdownV2")
+    bot.send_message(message.chat.id, telegramify_markdown.markdownify(f'Использовать текст в сообщении для активации бота: {yesAwnser if config == True else noAwnser}'), reply_markup=markup, parse_mode="MarkdownV2")
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "toggleTextContext")
@@ -420,25 +456,20 @@ def groupauth_callback(call):
             if not IsUserRegistered(data[1]):
                 SetWaitForLoginData(whoClicked, False)
                 keyboard = types.InlineKeyboardMarkup()
-                yesButton = types.InlineKeyboardButton(text="Да", callback_data=f"stateGroupAuth:True:" + data[1])
-                noButton = types.InlineKeyboardButton(text="Отмена", callback_data=f"stateGroupAuth:False:" + data[1])
+                yesButton = types.InlineKeyboardButton(text="Да", callback_data=f"stateGroupAuth:True:"+data[1])
+                noButton = types.InlineKeyboardButton(text="Отмена", callback_data=f"stateGroupAuth:False:"+data[1])
                 if not isUserBanned(whoClicked):
                     keyboard.add(yesButton)
                     keyboard.add(noButton)
-                send_message(whoClicked, "Подтвердите, что вы хотите авторизоваться в группе \nID: `" + (str(data[
-                                                                                                                 1])) + '`\n\n Нажимая кнопку "Да" вы соглашаетесь с тем что ваши данные Journal будут использованы для группы.',
-                             reply_markup=keyboard)
+                send_message(whoClicked, "Подтвердите, что вы хотите авторизоваться в группе \nID: `" + (str(data[1])) + '`\n\n Нажимая кнопку "Да" вы соглашаетесь с тем что ваши данные Journal будут использованы для группы.',reply_markup=keyboard)
             else:
-                send_message(whoClicked,
-                             "Вы не можете авторизовать группу так как она уже кем то авторизована. Напищите в группе комманду `/clearauth` для привязки ваших данных к группе")
+                send_message(whoClicked, "Вы не можете авторизовать группу так как она уже кем то авторизована. Напищите в группе комманду `/clearauth` для привязки ваших данных к группе")
         else:
-            send_message(whoClicked,
-                         "Ваши данные не зарегистрированы. Пожалуйста, сперва сначала пройдите процесс авторизации /auth")
+            send_message(whoClicked, "Ваши данные не зарегистрированы. Пожалуйста, сперва сначала пройдите процесс авторизации /auth")
     else:
         try:
             if not isUserBanned(whoClicked):
-                send_message(whoClicked,
-                             "Чтобы авторизоваться в группе, необходимо зарегистрироваться ваш Telegram аккаунт в боте.\n\nДля этого нужно использовать комманду /auth")
+                send_message(whoClicked, "Чтобы авторизоваться в группе, необходимо зарегистрироваться ваш Telegram аккаунт в боте.\n\nДля этого нужно использовать комманду /auth")
         except:
             pass
 
@@ -447,7 +478,7 @@ def groupauth_callback(call):
 def printHelp(message):
     finalText = """
     Список комманд: 
-
+    
 */start* - Начтаь общение с ботом
 */auth* - Запуск процесса авторизации
 */cancelauth* - Отмена ожидания авторизации
@@ -477,10 +508,10 @@ def printHelp(message):
 Подключите бота к группе, выдайте ему права администратора для отправки сообщений в чат (по умолчанию бот не может это делать если он подключен к групповому  чату)
 Авторизируйте свой аккаунт в личных сообщениях. В группе пропишите комманду /auth и бот отправит кнопку с ссылкой. Нажмите на эту кнопку и вам придёт запрос на подтверждение от бота, подтвердите привязку и бот в группе сообщит об успешной привязке аккаунта! 
 """
-    finalText = finalText.replace("-", "\\-").replace(".", "\\.").replace("!", "\\!").replace("(", "\\(").replace(")",
-                                                                                                                  "\\)").replace(
-        "<", "\\<").replace(">", "\\>").replace("}", "\\}").replace("{", "\\{").replace("+", "\\+")
+    finalText = finalText.replace("-", "\\-").replace(".", "\\.").replace("!", "\\!").replace("(", "\\(").replace(")", "\\)").replace("<", "\\<").replace(">", "\\>").replace("}", "\\}").replace("{", "\\{").replace("+", "\\+")
     bot.reply_to(message, finalText, parse_mode='MarkdownV2')
+
+
 
 
 def EaseAuth(uid):
@@ -505,8 +536,11 @@ def EaseAuth(uid):
         return None
 
 
-def ReAuthInSystem(message):
-    uid = str(message.chat.id)
+def ReAuthInSystem(message=None, uidNotMessage=None):
+    uid = uidNotMessage
+    if uidNotMessage is None:
+        uid = str(message.chat.id)
+
     if IsUserRegistered(uid):
         authData = {
             "application_key": '6a56a5df2667e65aab73ce76d1dd737f7d1faef9c52e8b8c55ac75f565d8e8a6',
@@ -520,16 +554,15 @@ def ReAuthInSystem(message):
             userInfo = ReadJSON(uid + '/botInfo.json')
             userInfo['jwtToken'] = tkn
             userInfo['jwtExpiries'] = responseJson.get('expires_in_access')
-            if message.chat.type != 'private':
+            if uidNotMessage is None and message.chat.type != 'private':
                 userInfo['chat_type'] = message.chat.type
             SaveJSON(uid + '/botInfo.json', userInfo)
-            return tkn, None
+            return tkn
         else:
-            return auth.status_code, auth
+            return auth.status_code
     else:
         bot.reply_to(message, "Для начала привяжите ваши данные в боте: /auth")
-        return None, None
-
+        return None
 
 @bot.message_handler(commands=['exams'])
 def exams(message):
@@ -540,10 +573,9 @@ def exams(message):
         return
 
     if IsUserRegistered(message.chat.id):
-        tkn, notUsable = ReAuthInSystem(message)
-        userExams = get('https://msapi.top-academy.ru/api/v2/dashboard/info/future-exams', tkn)
+        userExams = get('https://msapi.top-academy.ru/api/v2/dashboard/info/future-exams', ReAuthInSystem(message))
         userExams = userExams.json()
-        # [{'spec': 'Операционные системы и среды', 'date': '2024-12-13'}]
+        #[{'spec': 'Операционные системы и среды', 'date': '2024-12-13'}]
 
         finalResponse = "Расписание экзаменов:\n\n"
 
@@ -554,7 +586,6 @@ def exams(message):
             finalResponse = "\n\n > Пусто"
 
         send_message(message.chat.id, finalResponse, message_thread_id=forum)
-
 
 def getGmtCorrection(uid):
     try:
@@ -569,7 +600,6 @@ def getGmtCorrection(uid):
     except:
         return 0
 
-
 @bot.message_handler(commands=['passnotify'])
 def cancelNotify(message):
     uid = str(message.chat.id)
@@ -580,9 +610,11 @@ def cancelNotify(message):
 @bot.message_handler(commands=['whatTimeForBot', 'whattimeforbot'])
 def whatTimeForBot(message):
     uid = str(message.chat.id)
-    bot.send_message(uid, str("Время для бота: "+moscowTime.strftime("%H:%M")))
-    timeCorrected = moscowTime + timedelta(hours=getGmtCorrection(uid))
-    bot.send_message(uid, str("Время с поправкой на ваш регион: " + timeCorrected.strftime("%H:%M")))
+    bot.send_message(uid, str(moscowTime.strftime("%H_%M")))
+    timeCorrected = moscowTime+timedelta(hours=getGmtCorrection(uid))
+    bot.send_message(uid, str("With gmt correction: "+timeCorrected.strftime("%H_%M")))
+
+
 
 
 @bot.message_handler(commands=['notifyme', 'notify'])
@@ -594,7 +626,6 @@ def notifier(message):
 Вы также можете дополнить сообщение если нужно получить расписание на следющий день, например: */notify 23:00 1*\n
 Единица в команде указывает кол-во сдвигов по дням, то есть если указать 1 то бот пришлёт расписание на следующий день.\n
 \nВы так-же можете дописать *silent* к вашей команде что заставит бота отправлять расписание "без звука" *Примеры*: ``` 23:00 1 silent```\n``` 10.00 silent``` 
-(Настроить часовой пояс можно через команду /gmt)
 """)
     SetWaitForNotify(uid, True)
 
@@ -603,6 +634,7 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
     if IsUserRegistered(uid):
         if isUserBanned(uid):
             return
+
 
         basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
         date = datetime.today()
@@ -613,7 +645,7 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
 
         date = date + timedelta(days=additionalDay)
 
-        date = date.strftime('%Y-%m-%d')
+        date=date.strftime('%Y-%m-%d')
         # https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
 
         fetchResult = get(basicUrl + date, lastJwt)
@@ -624,8 +656,7 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
             for lesson in jsonResult:
                 finalText += '>Пара ' + str(lesson.get('lesson')) + ':  ' + lesson.get('teacher_name') + '\n'
                 finalText += '```\n' + lesson.get('subject_name') + "\n"
-                finalText += lesson.get('started_at') + " - " + lesson.get('finished_at') + " (" + lesson.get(
-                    'room_name') + ")\n"
+                finalText += lesson.get('started_at') + " - " + lesson.get('finished_at') + " (" + lesson.get('room_name') + ")\n"
                 finalText += "```\n"
 
             if len(finalText) == 0:
@@ -636,14 +667,188 @@ def sheduleNotifySender(uid, lastJwt, additionalDay=0, silent=False):
                 max_line_length=None,
                 normalize_whitespace=False
             )
-            silent = (silent == True)
+            silent = (silent==True)
 
             if silent:
-                bot.send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + converted,
-                                 disable_notification=silent, parse_mode='MarkdownV2')
+                bot.send_message(uid, "*Silent Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent, parse_mode='MarkdownV2')
             else:
-                bot.send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + converted,
-                                 disable_notification=silent, parse_mode='MarkdownV2')
+                bot.send_message(uid, "*Notifier Service*\nПары на `" + date + "`:\n\n" + converted, disable_notification=silent, parse_mode='MarkdownV2')
+
+
+
+def GetShedForTime(day=None, uid=None, NeedReAuth = True, tomorrow=False, secondsClarify=False):
+    if day is None:
+        day = datetime.now()  # Берем текущую дату и время
+    elif isinstance(day, str):
+        day = datetime.strptime(day, "%Y-%m-%d")  # Конвертируем строку в datetime
+
+    timeCorrection = getGmtCorrection(uid)  # Получаем корректировку времени
+    day = day + timedelta(hours=timeCorrection)  # Добавляем часы
+
+    if NeedReAuth and uid is not None:
+        ReAuthInSystem(uidNotMessage=uid)
+
+    uiInfo = ReadBotJson(uid)
+    lastJwt = uiInfo.get('jwtToken')
+    tomorrowText = "(Завтра)" if tomorrow else ""
+
+    basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
+    finalDay = day.strftime('%Y-%m-%d')
+    fetchResult = get(basicUrl + finalDay, lastJwt)
+    if fetchResult.status_code == 200:
+        jsonResult = fetchResult.json()
+        startText = f"> Бот покажет расписание на тот день, на который вы нажали\n\n"
+
+        finalText = ""
+        for lesson in jsonResult:
+            finalText += '>*Пара ' + str(lesson.get('lesson')) + ':  ' + lesson.get('teacher_name') + '*\n'
+            finalText += '```\n' + lesson.get('subject_name') + "\n"
+            finalText += lesson.get('started_at') + " - " + lesson.get('finished_at') + " (" + lesson.get(
+                'room_name') + ")\n"
+            finalText += "```\n"
+
+        if len(jsonResult) == 0:
+            finalText = "\n>В этот день ничего нет :)"
+
+        #finalText = f"UID: {uid}\nДень: `{finalDay}`\nПоследнее обновление: `{datetime.now().strftime('%H:%M')}`\n\n"+finalText
+        finalText = f"{startText}\nПоследнее обновление: `{datetime.now().strftime('%H:%M:%S') if secondsClarify else datetime.now().strftime('%H:%M')}`\nДень: `{finalDay} {day.strftime('%H:%M')} {tomorrowText}`\n\n"+finalText
+
+        return telegramify_markdown.markdownify(finalText)
+    return -1
+
+
+
+DynamicMessagesActions = [
+    "<-",
+    "->",
+    "Сегодня",
+    "Завтра",
+    "UpdateGlobally"
+]
+
+def get_keyboard():
+    keyboard = InlineKeyboardMarkup()
+    keyboard.row(
+        InlineKeyboardButton("⬅", callback_data="<-"),
+        InlineKeyboardButton("Сегодня", callback_data="Сегодня"),
+        InlineKeyboardButton("➡", callback_data="->")
+    )
+    keyboard.row(
+        InlineKeyboardButton("Завтра", callback_data="Завтра")
+    )
+    keyboard.row(
+        InlineKeyboardButton("Обновить для текущего времени", callback_data="UpdateGlobally")
+    )
+    return keyboard
+
+@bot.message_handler(commands=['dynamicmessage'])
+def DynamicMessage(message):
+    uid = str(message.chat.id)
+    userInitCmd = message.from_user.id
+
+    if not IsUserRegistered(userInitCmd):
+        bot.reply_to(message, "Обновление сообщения не будет учитывать сдвиг времени, для того чтобы учитывать - человек, привязавший группу должен выполнить эту команду заново", parse_mode='MarkdownV2')
+
+
+
+
+
+    forum = isForum(message)
+    botin = ReadJSON(uid + '/botInfo.json')
+    DynamicChatID = botin.get('DynamicChatID')
+    DynamicForumID = botin.get('DynamicForumID')
+    DynamicChatMessage = botin.get('DynamicID')
+
+    ShedForDay = GetShedForTime(uid=uid, NeedReAuth=True)
+
+
+
+
+    if DynamicChatMessage is not None:
+        try:
+            bot.delete_message(DynamicChatID, DynamicChatMessage)
+            DBMessages.UnRegisterMessageReloader(DynamicChatID)
+        except: print("Failed to delete dynamic message")
+
+    Message = bot.send_message(uid, text=ShedForDay, message_thread_id=forum, reply_markup=get_keyboard(), parse_mode="MarkdownV2")
+    DynamicChatMessage, botin['DynamicID'] = 2 * [Message.message_id]
+    DynamicChatID, botin['DynamicChatID'] = 2 * [uid]
+    DynamicForumID, botin['DynamicForumID'] = 2 * [forum]
+    SaveJSON(uid+'/botInfo.json', botin)
+    DBMessages.RegisterMessageReloader(DynamicChatID, DynamicChatMessage, userInitCmd, getGmtCorrection(userInitCmd))
+
+
+
+
+@bot.callback_query_handler(func=lambda call: call.data in DynamicMessagesActions)
+def callback_handler(call):
+    current_text = call.message.text
+    MessageUpdateTime = re.search(r"Последнее обновление: \s*(\S+)", current_text).group(1)
+    uid = call.message.chat.id
+    bot.set_message_reaction(call.message.chat.id, call.message.id, [ReactionTypeEmoji('👀')], is_big=False)
+    #uid = re.search(r"UID:\s*(\S+)", current_text).group(1)
+
+    match = re.search(r"День: \s*(\d{4}-\d{2}-\d{2})", current_text).group(1)
+    DayInMessage = match
+    CurrentDayWithGMT = (datetime.now() + timedelta(hours=getGmtCorrection(uid))).strftime('%Y-%m-%d')
+    bot.answer_callback_query(call.id, show_alert=False)
+
+    if DayInMessage == CurrentDayWithGMT and call.data == "Сегодня":
+        print("Обновление текущего дня из текущего дня пропущено")
+        return
+    if "(Завтра)" in current_text and call.data == "Завтра":
+        print("Обновление завтрашнего дня с уже написанным завтрашним днём")
+        return
+
+    tomorrowBtn = False
+    if match:
+        match = match
+        match = datetime.strptime(match, "%Y-%m-%d")
+        if call.data == "Сегодня":
+            match = datetime.now().strftime("%Y-%m-%d")
+        if call.data == "Завтра":
+            match = datetime.today() + timedelta(days=1)
+            tomorrowBtn = True
+        if call.data == "->":
+            match = match + timedelta(days=1)
+        if call.data == "<-":
+            match = match - timedelta(days=1)
+        if call.data == "UpdateGlobally":
+            match = None
+
+        #Convert to datetime and get in %Y-%m-%d format
+
+
+    GetCurrentTime = (datetime.today() + timedelta(hours=getGmtCorrection(uid))).strftime("%H:%M")
+    NeedReAuth = False
+    try:
+        NeedReAuth = (datetime.strptime(GetCurrentTime, "%H:%M") - datetime.strptime(MessageUpdateTime, "%H:%M")).total_seconds() > 14400
+    except:
+        NeedReAuth = True
+    NewShedTimeText = GetShedForTime(day=match, uid=uid, NeedReAuth=NeedReAuth, tomorrow = tomorrowBtn)
+
+
+
+    bot.set_message_reaction(call.message.chat.id, call.message.id, [ReactionTypeEmoji('👨‍💻')], is_big=False)
+    try:
+        bot.edit_message_text(
+            chat_id=uid,
+            message_id=call.message.message_id,
+            text=NewShedTimeText,  # Меняем текст на выбранный
+            reply_markup=get_keyboard(),
+            parse_mode="MarkdownV2"  # Оставляем кнопки
+        )
+        bot.set_message_reaction(call.message.chat.id, call.message.id, [ReactionTypeEmoji('😁')], is_big=False)
+    except Exception as e:
+        print(e)
+
+
+
+
+
+
+
+
 
 
 def ClearCachedJWT(uid):
@@ -655,6 +860,12 @@ def ClearCachedJWT(uid):
         SaveJSON(uid + '/botInfo.json', userInfo)
 
 
+def isFirstApril():
+    return datetime.today().month == 4 and datetime.today().day == 1
+
+def ThreePercentChance():
+    return random.randint(1, 100) <= 3
+
 
 @bot.message_handler(commands=['gmt'])
 def setupGmtCorrection(message):
@@ -662,16 +873,12 @@ def setupGmtCorrection(message):
     if IsUserRegistered(message.from_user.id):
         msg = message.text.split(' ')
         if len(msg) != 2:
-            bot.reply_to(message, text=telegramify_markdown.markdownify(
-                "Для корректировки времени нужно выполнить комманду в формате:\n\n```/gmt +1```\nГде +1 - сдвиг на 1 час относительно бота (Например: Москва +2 | Самара +1).\n\nЧтобы узнать текущее время для бота, напишите ему команду: /whatTimeForBot"),
-                         parse_mode='MarkdownV2', message_thread_id=isForum(message))
+            bot.reply_to(message, text=telegramify_markdown.markdownify("Для корректировки времени нужно выполнить комманду в формате:\n\n```/gmt +1```\nГде +1 - сдвиг на 1 час от GMT 0 (Например: Москва - GMT +3, Самара - GMT +4).\n\nЧтобы узнать текущее время для бота, напишите ему команду:\n```/whatTimeForBot```"), parse_mode='MarkdownV2', message_thread_id=isForum(message))
             return
         gmtCorrection = msg[1]
         gmtCorrection = gmtCorrection.replace('+', '')
         if not gmtCorrection.isdigit() and '-' not in gmtCorrection:
-            bot.reply_to(message, text=telegramify_markdown.markdownify(
-                "Введенное значение должно быть числом! (Положительным, отрицательным или нулевым)"),
-                         parse_mode='MarkdownV2', message_thread_id=isForum(message))
+            bot.reply_to(message, text=telegramify_markdown.markdownify("Введенное значение должно быть числом! (Положительным, отрицательным или нулевым)"), parse_mode='MarkdownV2', message_thread_id=isForum(message))
             return
         gmtCorrection = int(gmtCorrection)
         botInfo = ReadBotJson(uid)
@@ -679,47 +886,37 @@ def setupGmtCorrection(message):
         if gmtCorrection == 0:
             botInfo['gmtCorrection'] = None
         SaveJSON(uid + '/botInfo.json', botInfo)
+
+        try: DBMessages.ChangeGMT(connectedFrom=message.from_user.id, gmtValue=gmtCorrection)
+        except Exception as e: print("Failed wrok with db:", e)
+
         bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👍')], is_big=False)
     else:
-        bot.send_message(message.chat.id, text=telegramify_markdown.markdownify("Вы не зарегистрированы!"),
-                         parse_mode='MarkdownV2', message_thread_id=isForum(message))
+        bot.send_message(message.chat.id, text=telegramify_markdown.markdownify("Вы не зарегистрированы!"), parse_mode='MarkdownV2', message_thread_id=isForum(message))
 
 
-
-def isFirstApril():
-    return datetime.today().month == 4 and datetime.today().day == 1
-
-
-def ThreePercentChance():
-    return random.randint(1, 100)
-
-@bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed'])
-def fetchDate(message):
+@bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed', 'Пары', 'ПАРЫ'])
+def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
     forum = isForum(message)
-    if isUserBanned(message.from_user.id):
-        return
-    if not IsUserRegistered(uid):
-        send_message(uid, "Для начала - зарегиструйтесь в боте (или привяжите группу): /auth", message_thread_id=isForum(message))
-        return
 
-    if isFirstApril():
-        with open("EasterEggs/shedule_in_4k.jpg", "rb") as file:
+    if isFirstApril() and not Relaunch:
+        with open("EasterEggs/shedule_in_4k.jpg", "rb") as photo:
             bot.send_photo(
                 chat_id=message.chat.id,
-                photo=file,
+                photo=photo,
                 caption="Вот расписание на указанный день!",
                 message_thread_id=forum,
                 reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
             )
         time.sleep(7)
     else:
-        if ThreePercentChance() <= 3:
-            with open("EasterEggs/EasterEgg.mp4", "rb") as file:
-                bot.send_video(
+        if ThreePercentChance():
+            with open("EasterEggs/walter_black.jpg", "rb") as photo:
+                bot.send_photo(
                     chat_id=message.chat.id,
-                    video=file,
-                    caption="Не, мне лень 😑. Сам ищи",
+                    photo=photo,
+                    caption="Nuh, i dont want to do it",
                     message_thread_id=forum,
                     reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
                 )
@@ -728,20 +925,30 @@ def fetchDate(message):
 
 
 
+    if IsUserRegistered(uid):
 
-    bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('🤔')], is_big=False)
-    # bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👀')], is_big=False)
-    NotUsable, call = ReAuthInSystem(message)
+        if isUserBanned(message.from_user.id):
+            return
 
-    SendedMessage = send_message(uid, "Секунду, ищу расписание 👨‍💻", disable_notification=True, message_thread_id=forum)
-    uiInfo = ReadBotJson(uid)
-    lastJwt = uiInfo.get('jwtToken')
-    basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
-    operationDay = datetime.today()
-    showingText = "сегодня"
-    fetchResult = None
 
-    try:
+        bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👀')], is_big=False)
+
+
+        global showingText
+        global operationDay
+        sended_msg = Sended
+        if not Relaunch:
+            sended_msg = send_message(uid, "Секунду, ищем расписание...", disable_notification=True, message_thread_id=forum)
+
+        uiInfo = ReadBotJson(uid)
+        expiration_timestamp = uiInfo.get('jwtExpiries')
+        lastJwt = uiInfo.get('jwtToken')
+        basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
+        operationDay = datetime.today()
+        showingText = "сегодня"
+
+        if lastJwt is None or expiration_timestamp is None:
+            ReAuthInSystem(message)
 
         if strClear(message.text).isdigit():
             try:
@@ -762,76 +969,82 @@ def fetchDate(message):
                 operationDay = datetime.today() - timedelta(days=int(dayNum))
                 showingText = operationDay.strftime('%Y-%m-%d')
 
-        if "послезавтра" in message.text.lower():
-            showingText = "послезавтра"
-            operationDay = operationDay + timedelta(days=2)
-        elif "завтра" in message.text.lower() or "завтрв" in message.text.lower():
-            showingText = "завтра"
-            operationDay = operationDay + timedelta(days=1)
-        elif "вчера" in message.text.lower():
-            showingText = "вчера"
-            operationDay = operationDay - timedelta(days=1)
 
         operationDay = operationDay + timedelta(hours=getGmtCorrection(uid))
+        if "послезавтра" in message.text.lower():
+            operationDay = operationDay+timedelta(days=2)
+            showingText = f"послезавтра ({operationDay.strftime('%Y-%m-%d')})"
+        elif "завтра" in message.text.lower() or "завтрв" in message.text.lower():
+            operationDay = operationDay + timedelta(days=1)
+            showingText = f"завтра ({operationDay.strftime('%Y-%m-%d')})"
+        elif "вчера" in message.text.lower():
+            operationDay = operationDay-timedelta(days=1)
+            showingText = f"вчера ({operationDay.strftime('%Y-%m-%d')})"
+
+
 
         if type(operationDay) != str:
             operationDay = operationDay.strftime('%Y-%m-%d')
 
-        fetchResult = get(basicUrl + operationDay, lastJwt)
 
-        if fetchResult.status_code == 200:
-            jsonResult = fetchResult.json()
-            finalText = "Пары на *" + showingText + "*:\n\n"
-            for lesson in jsonResult:
-                finalText += '>*Пара ' + str(lesson.get('lesson')) + ':  ' + lesson.get('teacher_name') + '*\n'
-                finalText += '```\n' + lesson.get('subject_name') + "\n"
-                finalText += lesson.get('started_at') + " - " + lesson.get('finished_at') + " (" + lesson.get(
-                    'room_name') + ")\n"
-                finalText += "```\n"
+        if expiration_timestamp is None:
+            expiration_timestamp = time.time()+10
 
-            if len(jsonResult) == 0:
-                finalText = "В этот день ничего нет"
-                bot.edit_message_text(chat_id=message.chat.id, message_id=SendedMessage.message_id, text=finalText,
-                                      parse_mode='MarkdownV2')
-                bot.set_message_reaction(message.chat.id, SendedMessage.message_id, [ReactionTypeEmoji('🤩')],
-                                         is_big=False)
-            else:
+        if time.time() < expiration_timestamp and lastJwt is not None:
+            #JWT Key Is Still Valid
+            # Example of url by finding a day:
+            #https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
+
+            operationDay = operationDay
+            fetchResult = get(basicUrl+operationDay, lastJwt)
+            if fetchResult.status_code == 200:
+                jsonResult = fetchResult.json()
+
+                finalText = ""
+                for lesson in jsonResult:
+
+                    finalText += '>*Пара ' + str(lesson.get('lesson')) + ':  '+lesson.get('teacher_name')+'*\n'
+                    finalText += '```\n' + lesson.get('subject_name') + "\n"
+                    finalText += lesson.get('started_at')+" - "+lesson.get('finished_at')+" ("+lesson.get('room_name')+")\n"
+                    finalText += "```\n"
+
+
+                if sended_msg is not None:
+                    try:
+                        bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" +finalText, parse_mode='MarkdownV2')
+                        return
+                    except: pass
+
+
+                if len(finalText) == 0:
+                    finalText="В этот день ничего нет :D"
+
+                finalText = "Пары на *" + showingText + "*:\n\n" + finalText
                 converted = telegramify_markdown.markdownify(
                     finalText,
                     max_line_length=None,
                     normalize_whitespace=False
                 )
+                try:
+                    bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=converted, parse_mode='MarkdownV2')
+                except:
+                    bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum)
+            else:
+                if not Relaunch:
+                    ClearCachedJWT(uid)
+                    bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                    fetchDate(message, True, sended_msg)
+                else:
+                    send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом...", message_thread_id=forum)
+        else:
+            if not Relaunch:
+                ClearCachedJWT(uid)
+                bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                fetchDate(message, True, sended_msg)
+            else:
+                send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом...", message_thread_id=forum)
 
-                bot.edit_message_text(chat_id=message.chat.id, message_id=SendedMessage.message_id,
-                                      text=converted, parse_mode='MarkdownV2')
-                bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('😇')], is_big=False)
 
-    except Exception as err:
-        FetchMsg = "Unknown"
-        if call is None: FetchMsg = "Unknown (None)"
-        try:
-            FetchMsg = call.json()
-        except Exception as e:
-            FetchMsg = "Unknown (Also Iternal Error: " + str(e) + ")"
-
-
-        txt = f"""
-*ChatID*\\: {message.chat.id}
-*8MessageID*\\: {message.message_id}
-*JournalResponsedStatusCode*\\: {fetchResult.status_code}
-*JWT*\\: {lastJwt}
-*SendedMessageId*\\: {SendedMessage.message_id}
-*NotBotIssue*\\: {FetchMsg}
-
-*Failed via*\\: {str(err)}
-"""
-        exception = telegramify_markdown.markdownify(
-            str(txt),
-            max_line_length=None,
-            normalize_whitespace=False
-        )
-
-        bot.send_message(uid, exception, message_thread_id=forum, parse_mode='MarkdownV2')
 
 @bot.message_handler(commands=['cleanauthingroups'])
 def globalCleaner(message):
@@ -852,11 +1065,8 @@ def globalCleaner(message):
                         groupBotData['jwtToken'] = None
                         groupBotData['jwtExpiries'] = None
                         SaveJSON(groupid + '/botInfo.json', groupBotData)
-                        send_message(uid,
-                                     "Авторизация для группы *" + groupid + "* очищена. Групп с вашей авторизацией осталось: " + (
-                                         str(len(userConnectedGroups))))
-                        send_message(groupInt,
-                                     """Авторизация для этой группы была отозвана. Используйте комманду /auth чтобы зарегистрировать этого бота.""")
+                        send_message(uid, "Авторизация для группы *"+groupid+"* очищена. Групп с вашей авторизацией осталось: "+(str(len(userConnectedGroups))))
+                        send_message(groupInt, """Авторизация для этой группы была отозвана. Используйте комманду /auth чтобы зарегистрировать этого бота.""")
                     except Exception as e:
                         send_message(uid, e)
 
@@ -875,23 +1085,22 @@ def cleanerById(message):
             if len(keys) == 2:
                 groupid = keys[1]
                 if os.path.exists(userFolderPath + '/' + groupid):
-                    userConnectedGroups = ReadFile(uid + '/list.inf').split("\n")
+                    userConnectedGroups = ReadFile(uid+'/list.inf').split("\n")
 
                     if groupid in userConnectedGroups and type(groupid) == str:
                         try:
                             groupInt = int(groupid)
                             userConnectedGroups.remove(groupid)
-                            SaveFileByList(uid + '/list.inf', userConnectedGroups)
+                            SaveFileByList(uid+'/list.inf', userConnectedGroups)
 
-                            groupBotData = ReadJSON(groupid + '/botInfo.json')
+                            groupBotData = ReadJSON(groupid+'/botInfo.json')
                             groupBotData['login'] = None
                             groupBotData['password'] = None
                             groupBotData['jwtToken'] = None
                             groupBotData['jwtExpiries'] = None
-                            SaveJSON(groupid + '/botInfo.json', groupBotData)
-                            send_message(uid, "Авторизация для группы *" + groupid + "* очищена.")
-                            send_message(groupInt,
-                                         "Данные авторизации для этой группы больше не активны. Невозможно запрашивать данные. Пройдите авторизацию с помощью /auth")
+                            SaveJSON(groupid+'/botInfo.json', groupBotData)
+                            send_message(uid, "Авторизация для группы *"+groupid+"* очищена.")
+                            send_message(groupInt, "Данные авторизации для этой группы больше не активны. Невозможно запрашивать данные. Пройдите авторизацию с помощью /auth")
 
                         except Exception as e:
                             send_message(uid, e)
@@ -905,8 +1114,7 @@ def cleanerById(message):
                 else:
                     send_message(uid, "Не можем найти группу проверьте её написание. Сначала выполните команду /start")
             else:
-                send_message(uid,
-                             "После комманды укажите ID чата группы где вы хотите отвязать авторизацию. Пример: */cleanauthbyid " + uid + "*")
+                send_message(uid, "После комманды укажите ID чата группы где вы хотите отвязать авторизацию. Пример: */cleanauthbyid "+uid+"*")
         else:
             send_message(uid, "Не можем найти ваш профиль. Сначала выполните команду /start")
     else:
@@ -914,8 +1122,6 @@ def cleanerById(message):
 
 
 listOfAuthGroups = []
-
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("stateGroupAuth"))
 def stateGroupAuth(call):
     global listOfAuthGroups
@@ -938,23 +1144,21 @@ def stateGroupAuth(call):
                     SaveJSON(groupId + '/botInfo.json', OriginalGroupInfo)
 
                     listOfAuthGroups = []
-                    if not os.path.exists(userFolderPath + '/' + uid + '/list.inf'):
-                        CreateFile(uid + '/list.inf', groupId)
+                    if not os.path.exists(userFolderPath+'/'+ uid+ '/list.inf'):
+                        CreateFile(uid+'/list.inf', groupId)
                         listOfAuthGroups = [groupId]
                     else:
-                        listOfAuthGroups = ReadFile(uid + '/list.inf')
+                        listOfAuthGroups = ReadFile(uid+ '/list.inf')
                         listOfAuthGroups = listOfAuthGroups.split("\n")
                         if groupId not in listOfAuthGroups:
                             listOfAuthGroups.append(groupId)
-                        SaveFileByList(uid + '/list.inf', listOfAuthGroups)
+                        SaveFileByList(uid+ '/list.inf', listOfAuthGroups)
 
-                    send_message(call.from_user.id,
-                                 "Благодарим за активацию данных бота, мы постараемся не говорить кто активировал бота в группе :)")
-                    send_message(groupId, "Кто-то успешно зарегестрировал бота в группе (ID:" + (str(groupId)) + ')',
-                                 disable_notification=True)
+
+                    send_message(call.from_user.id, "Благодарим за активацию данных бота, мы постараемся не говорить кто активировал бота в группе :)")
+                    send_message(groupId, "Кто-то успешно зарегестрировал бота в группе (ID:" + (str(groupId)) + ')', disable_notification=True)
                 else:
-                    send_message(call.from_user.id,
-                                 "Ваши данные не зарегистрированы. Пожалуйста, выполните комманду /auth а затем зарегистрируйте бота в группе")
+                    send_message(call.from_user.id, "Ваши данные не зарегистрированы. Пожалуйста, выполните комманду /auth а затем зарегистрируйте бота в группе")
             else:
                 send_message(call.from_user.id, "Ваши данные не зарегистрированы. Пожалуйста, выполните комманду /auth")
         else:
@@ -963,7 +1167,11 @@ def stateGroupAuth(call):
         if not isUserBanned(call.from_user.id):
             bot.send_message(call.from_user.id, "Как скажете, если передумаете - просто нажмите кнопку \"Да\" выше")
 
-    # makeAuth(chat_id, True)
+
+
+
+
+    #makeAuth(chat_id, True)
 
 
 def get(url, authToken=None):
@@ -1008,19 +1216,13 @@ def echo_message(message):
         SetWaitForNotify(uid, False)
         SetWaitForLoginData(uid, False)
         args = text.split(" ")
-        userTime = args[0].replace(' ', '').replace('silent', '').replace('.', ':').replace('_', ':')
-        OrigUserTime = userTime
+        userTime = args[0].replace(' ','').replace('silent','').replace('.',':').replace('_',':')
 
-        if getGmtCorrection(uid) < 0:
-            userTime = (datetime.strptime(userTime, "%H:%M") + timedelta(hours=getGmtCorrection(uid))).strftime("%H:%M")
-        else:
-            userTime = (datetime.strptime(userTime, "%H:%M") - timedelta(hours=getGmtCorrection(uid))).strftime("%H:%M")
-
+        userTime = (datetime.strptime(userTime, "%H:%M") + timedelta(hours=getGmtCorrection(uid))).strftime("%H:%M")
         if is_valid_time(userTime):
             ###
             cleanNotifyList(uid)
-            send_message(uid, f"""Уведомления успешно активированы. Время уведомлений (для бота): {userTime}
-Время уведомления с учётом сдвига времени: {OrigUserTime}""")
+            send_message(uid, "Уведомления успешно активированы. Время уведомлений: " + userTime)
 
             userBotInfo = ReadJSON(uid + '/botInfo.json')
             additionalDay = 0
@@ -1032,11 +1234,11 @@ def echo_message(message):
             clear_user_notify_list(uid)
             add_user_to_notify_list(uid, userTime, additionalDay, 'silent' in text)
 
+
             CreateFolderIfNotExists(userFolderPath + '/notifyList/' + is_valid_time(userTime))
-            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + is_valid_time(userTime) + '/' + uid)
+            CreateFolderIfNotExists(userFolderPath + '/notifyList/' + is_valid_time(userTime) + '/'+uid)
         else:
-            send_message(uid,
-                         "Время уведомлений введено некорректно. Пожалуйста, выполните комманду /notifyme снова и введите время в формате HH:MM")
+            send_message(uid, "Время уведомлений введено некорректно. Пожалуйста, выполните комманду /notifyme снова и введите время в формате HH:MM")
 
 
     elif ui.get('WaitForAuth') and not isMessageFromGroup(message):
@@ -1068,16 +1270,14 @@ def echo_message(message):
                 userName = fullUserInfo.json()
                 if message.chat.type != 'private':
                     userName = "{скрыто}"
-                else:
-                    userName = userName.get('full_name')
+                else: userName = userName.get('full_name')
 
-                send_message(uid,
-                             "Спасибо за авторизацию в боте, " + userName + '!\n\nТеперь у вас есть возможность запрашивать расписание для вашего Journal. :)')
+
+                send_message(uid, "Спасибо за авторизацию в боте, " + userName + '!\n\nТеперь у вас есть возможность запрашивать расписание для вашего Journal. :)')
 
             except Exception as e:
                 print("Error", e)
-                send_message(uid,
-                             "Мы вошли в ваш аккаунт, но при получении допонительных данных произошла ошибка. Вы можете попробовать ещё раз или игнорировать это.\n(api/v2/settings/u-i: get() error)")
+                send_message(uid, "Мы вошли в ваш аккаунт, но при получении допонительных данных произошла ошибка. Вы можете попробовать ещё раз или игнорировать это.\n(api/v2/settings/u-i: get() error)")
 
             SaveJSON(uid + '/botInfo.json', userInfo)
             SetWaitForLoginData(uid, False)
@@ -1092,9 +1292,19 @@ def echo_message(message):
 
     elif IsUserRegistered(uid) and not ui.get('WaitForAuth'):
         if True:
-            if '!пары' in message.text.lower() or '!gfhs' in message.text.lower() or '!расписание' in message.text.lower() or (
-                    GetUseTextContext(message.chat.id) and 'пары' in message.text.lower()):
+            if '!пары' in message.text.lower() or '!gfhs' in message.text.lower() or '!расписание' in message.text.lower() or (GetUseTextContext(message.chat.id) and 'пары' in message.text.lower()):
                 fetchDate(message)
+
+
+
+
+
+
+
+
+
+
+
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "ok_pressed")
@@ -1110,8 +1320,8 @@ def send_message(userId, msg, reply_markup=None, disable_notification=False, mes
         normalize_whitespace=False,
 
     )
-    return bot.send_message(userId, converted, parse_mode='MarkdownV2', reply_markup=reply_markup,
-                            disable_notification=disable_notification, message_thread_id=message_thread_id)
+    return bot.send_message(userId, converted, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification, message_thread_id=message_thread_id)
+
 
 
 while True:
