@@ -182,11 +182,13 @@ def isUserBanned(userId):
 
 
 def RefreshAdaptiveMessage():
+    ChangesThisTime = False
     while True:
-        time.sleep(30)
+        time.sleep(15)
         #Get Minute Of Current Time
         minute = (datetime.now().minute % 30) == 0
-        if minute:
+        if minute and not ChangesThisTime:
+            ChangesThisTime = True
             WhatToRefresh = DBMessages.GetAllMessages()
             for message in WhatToRefresh:
                 ChatID = message.get('chatId')
