@@ -183,7 +183,7 @@ def isUserBanned(userId):
 
 def RefreshAdaptiveMessage():
     while True:
-        time.sleep(5)
+        time.sleep(30)
         #Get Minute Of Current Time
         minute = (datetime.now().minute % 30) == 0
         if minute:
@@ -197,6 +197,7 @@ def RefreshAdaptiveMessage():
                     bot.edit_message_text(chat_id=ChatID, message_id=uid, text=NewShedTimeText, parse_mode="MarkdownV2", reply_markup=get_keyboard())
                 except Exception as e:
                     print(e)
+
 
 
 AdaptiveChanges = Thread(target=RefreshAdaptiveMessage)
@@ -714,7 +715,7 @@ def GetShedForTime(day=None, uid=None, NeedReAuth = True, tomorrow=False, second
         finalText = f"{startText}\nПоследнее обновление: `{datetime.now().strftime('%H:%M:%S') if secondsClarify else datetime.now().strftime('%H:%M')}`\nДень: `{finalDay} {day.strftime('%H:%M')} {tomorrowText}`\n\n"+finalText
 
         return telegramify_markdown.markdownify(finalText)
-    return -1
+    return telegramify_markdown.markdownify(f"Error: fetchResult.status_code != 200 ({fetchResult.status_code})")
 
 
 
@@ -796,7 +797,7 @@ def callback_handler(call):
     match = re.search(r"День: \s*(\d{4}-\d{2}-\d{2})", current_text).group(1)
     DayInMessage = match
     CurrentDayWithGMT = (datetime.now() + timedelta(hours=getGmtCorrection(uid))).strftime('%Y-%m-%d')
-
+    uid = str(uid)
     if DayInMessage == CurrentDayWithGMT and call.data == "Сегодня":
         print("Обновление текущего дня из текущего дня пропущено")
         return
@@ -832,7 +833,6 @@ def callback_handler(call):
     NewShedTimeText = GetShedForTime(day=match, uid=uid, NeedReAuth=NeedReAuth, tomorrow = tomorrowBtn)
 
 
-
     bot.set_message_reaction(call.message.chat.id, call.message.id, [ReactionTypeEmoji('👨‍💻')], is_big=False)
     try:
         bot.edit_message_text(
@@ -845,6 +845,7 @@ def callback_handler(call):
         bot.set_message_reaction(call.message.chat.id, call.message.id, [ReactionTypeEmoji('😁')], is_big=False)
     except Exception as e:
         print(e)
+
     bot.answer_callback_query(call.id, show_alert=False)
 
 
@@ -1292,7 +1293,7 @@ def echo_message(message):
                 send_message(uid,
                              "Journal написал \"Неверный логин или пароль\".\nПроверьте написание логина и пароля в вашем сообщении и пришлите дейтсвующие данные от входа:\n\n```" + login + "```\n```" + pasw + "```")
             else:
-                send_message(uid, "Что-то пошло не так!")
+                send_message(uid, f"Что-то пошло не так! (Code - {auth.status_code})")
         ui['WaitForAuth'] = False
 
     elif IsUserRegistered(uid) and not ui.get('WaitForAuth'):
