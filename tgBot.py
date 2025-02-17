@@ -796,7 +796,6 @@ def callback_handler(call):
     match = re.search(r"День: \s*(\d{4}-\d{2}-\d{2})", current_text).group(1)
     DayInMessage = match
     CurrentDayWithGMT = (datetime.now() + timedelta(hours=getGmtCorrection(uid))).strftime('%Y-%m-%d')
-    bot.answer_callback_query(call.id, show_alert=False)
 
     if DayInMessage == CurrentDayWithGMT and call.data == "Сегодня":
         print("Обновление текущего дня из текущего дня пропущено")
@@ -846,6 +845,7 @@ def callback_handler(call):
         bot.set_message_reaction(call.message.chat.id, call.message.id, [ReactionTypeEmoji('😁')], is_big=False)
     except Exception as e:
         print(e)
+    bot.answer_callback_query(call.id, show_alert=False)
 
 
 
