@@ -1,4 +1,5 @@
 import random
+import spacy
 from threading import *
 
 from telebot.types import ReactionTypeEmoji, InlineKeyboardButton, InlineKeyboardMarkup
