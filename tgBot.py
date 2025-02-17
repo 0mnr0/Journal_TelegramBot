@@ -741,7 +741,7 @@ def get_keyboard():
     )
     return keyboard
 
-@bot.message_handler(commands=['dynamicmessage'])
+@bot.message_handler(commands=['dynamicmessage', 'DynamicMessage'])
 def DynamicMessage(message):
     uid = str(message.chat.id)
     userInitCmd = message.from_user.id
