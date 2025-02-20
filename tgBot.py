@@ -595,7 +595,7 @@ def ReAuthInSystem(message=None, uidNotMessage=None):
             SaveJSON(uid + '/botInfo.json', userInfo)
             return tkn
         else:
-            return auth.status_code
+            return "null (au.stcode)"
     else:
         bot.reply_to(message, "Для начала привяжите ваши данные в боте: /auth")
         return None
@@ -1037,7 +1037,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
         if expiration_timestamp is None:
             expiration_timestamp = time.time()+10
 
-        if time.time() < expiration_timestamp and lastJwt is not None:
+        if lastJwt is not None:
             #JWT Key Is Still Valid
             # Example of url by finding a day:
             #https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
@@ -1045,6 +1045,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
             operationDay = operationDay
             fetchResult = get(basicUrl+operationDay, lastJwt)
             if fetchResult.status_code == 200:
+                print(fetchResult)
                 jsonResult = fetchResult.json()
 
                 finalText = ""
@@ -1082,14 +1083,14 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     fetchDate(message, True, sended_msg)
                 else:
-                    send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом...", message_thread_id=forum)
+                    send_message(message.chat.id, f"Не удалось загрузить расписание. Что-то с JWT ключом... (FetchAPI Result Code: {fetchResult.status_code})", message_thread_id=forum)
         else:
             if not Relaunch:
                 ClearCachedJWT(uid)
                 bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                 fetchDate(message, True, sended_msg)
             else:
-                send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом...", message_thread_id=forum)
+                send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом... (lastJwt is None)", message_thread_id=forum)
 
 
 
@@ -1221,7 +1222,8 @@ def stateGroupAuth(call):
     #makeAuth(chat_id, True)
 
 
-def get(url, authToken=None, uidForTeacher=None):
+def get(url, authToken=None):
+    authToken = str(authToken)
     headers = {
         'origin': 'https://journal.top-academy.ru',
         'Referer': 'https://journal.top-academy.ru',
@@ -1231,7 +1233,7 @@ def get(url, authToken=None, uidForTeacher=None):
     return requests.get(url, headers=headers)
 
 
-def post(url, js, authToken='null', uidForTeacher=None):
+def post(url, js, authToken='null'):
     headers = {
         'Content-Type': 'application/json',
         'Origin': 'https://journal.top-academy.ru',
@@ -1298,7 +1300,7 @@ def echo_message(message):
             "username": login,
             "password": pasw,
         }
-        auth = post('https://msapi.top-academy.ru/api/v2/auth/login', authData, uidForTeacher = uid)
+        auth = post('https://msapi.top-academy.ru/api/v2/auth/login', authData)
         if auth.status_code == 200:
             responseJson = auth.json()
             userInfo = ReadJSON(uid + '/botInfo.json')
