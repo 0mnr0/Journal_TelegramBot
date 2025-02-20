@@ -1,5 +1,4 @@
 import random
-import spacy
 from threading import *
 
 from telebot.types import ReactionTypeEmoji, InlineKeyboardButton, InlineKeyboardMarkup
@@ -1045,7 +1044,6 @@ def fetchDate(message, Relaunch=False, Sended=None):
             operationDay = operationDay
             fetchResult = get(basicUrl+operationDay, lastJwt)
             if fetchResult.status_code == 200:
-                print(fetchResult)
                 jsonResult = fetchResult.json()
 
                 finalText = ""
