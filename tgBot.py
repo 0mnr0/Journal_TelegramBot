@@ -352,6 +352,38 @@ def cancelauth(message):
         send_message(uid, "Авторизация отменена. Чтобы привязать данные авторизации используйте /auth", message_thread_id=forum)
 
 
+@bot.message_handler(commands=['ImTeacher', 'imteacher'])
+def ImTeacher(message):
+    uid = str(message.chat.id)
+    textInMsg = message.text.split(' ', 1)
+    if len(textInMsg) == 1:
+        bot.reply_to(message, text="Синтаксис команды: /ImTeacher {useOmni: <bool>}")
+        return
+
+    Command = textInMsg[1]
+
+
+    botInfo = ReadJSON(uid + '/botInfo.json')
+    try:
+        Command = json.loads(Command)
+    except Exception as e:
+        print(e)
+        bot.reply_to(message, text="Неправильный JSON во второй части сообщения")
+        return
+
+
+
+    botInfo['UseOmni'] = Command.get("useOmni")
+    botInfo['TeacherCities'] = Command.get("cities")
+    SaveJSON(uid + '/botInfo.json', botInfo)
+    if Command.get("useOmni"):
+        send_message(uid, "Учли! Теперь бот будет использовать *Omni* для поиска расписания")
+    else:
+        send_message(uid, "Учли! Теперь бот будет использовать *Journal* для поиска расписания")
+
+
+
+
 @bot.message_handler(commands=['auth'])
 def makeAuth(message, messageIsAnId=False):
 
@@ -362,7 +394,7 @@ def makeAuth(message, messageIsAnId=False):
             send_message(message.chat.id, "\{ banned: true \}")
             return
 
-        if IsUserRegistered(message.chat.id) == False:
+        if not IsUserRegistered(message.chat.id):
             send_welcome(message)
             return
         else:
@@ -374,7 +406,7 @@ def makeAuth(message, messageIsAnId=False):
     if type(message) is int:
         user = message
 
-    if IsUserExists(user) == False:
+    if not IsUserExists(user):
         send_welcome(user)
         return
 
@@ -733,15 +765,15 @@ DynamicMessagesActions = [
 def get_keyboard():
     keyboard = InlineKeyboardMarkup()
     keyboard.row(
-        InlineKeyboardButton("⬅", callback_data="<-"),
-        InlineKeyboardButton("Сегодня", callback_data="Сегодня"),
-        InlineKeyboardButton("➡", callback_data="->")
+        InlineKeyboardButton("Сегодня", callback_data="Сегодня")
     )
     keyboard.row(
         InlineKeyboardButton("Завтра", callback_data="Завтра")
     )
     keyboard.row(
-        InlineKeyboardButton("Обновить для текущего времени", callback_data="UpdateGlobally")
+        InlineKeyboardButton("⬅", callback_data="<-"),
+        InlineKeyboardButton("Сейчас", callback_data="UpdateGlobally"),
+        InlineKeyboardButton("➡", callback_data="->")
     )
     return keyboard
 
@@ -792,12 +824,19 @@ def DynamicMessage(message):
 @bot.callback_query_handler(func=lambda call: call.data in DynamicMessagesActions)
 def callback_handler(call):
     current_text = call.message.text
-    MessageUpdateTime = re.search(r"Последнее обновление: \s*(\S+)", current_text).group(1)
+    MessageUpdateTime = re.search(r"Последнее обновление: \s*(\S+)", current_text)
+    if MessageUpdateTime is not None:
+        MessageUpdateTime = MessageUpdateTime.group(1)
+    else:
+        MessageUpdateTime = datetime.now().strftime('%H:%M:%S')
     uid = call.message.chat.id
     bot.set_message_reaction(call.message.chat.id, call.message.id, [ReactionTypeEmoji('👀')], is_big=False)
     #uid = re.search(r"UID:\s*(\S+)", current_text).group(1)
 
-    match = re.search(r"День: \s*(\d{4}-\d{2}-\d{2})", current_text).group(1)
+    match = re.search(r"День: \s*(\d{4}-\d{2}-\d{2})", current_text)
+    if match is not None:
+        match = match.group(1)
+
     DayInMessage = match
     CurrentDayWithGMT = (datetime.now() + timedelta(hours=getGmtCorrection(uid))).strftime('%Y-%m-%d')
     uid = str(uid)
@@ -810,7 +849,6 @@ def callback_handler(call):
 
     tomorrowBtn = False
     if match:
-        match = match
         match = datetime.strptime(match, "%Y-%m-%d")
         if call.data == "Сегодня":
             match = datetime.now().strftime("%Y-%m-%d")
@@ -1183,7 +1221,7 @@ def stateGroupAuth(call):
     #makeAuth(chat_id, True)
 
 
-def get(url, authToken=None):
+def get(url, authToken=None, uidForTeacher=None):
     headers = {
         'origin': 'https://journal.top-academy.ru',
         'Referer': 'https://journal.top-academy.ru',
@@ -1193,7 +1231,7 @@ def get(url, authToken=None):
     return requests.get(url, headers=headers)
 
 
-def post(url, js, authToken='null'):
+def post(url, js, authToken='null', uidForTeacher=None):
     headers = {
         'Content-Type': 'application/json',
         'Origin': 'https://journal.top-academy.ru',
@@ -1260,14 +1298,13 @@ def echo_message(message):
             "username": login,
             "password": pasw,
         }
-        auth = post('https://msapi.top-academy.ru/api/v2/auth/login', authData)
+        auth = post('https://msapi.top-academy.ru/api/v2/auth/login', authData, uidForTeacher = uid)
         if auth.status_code == 200:
             responseJson = auth.json()
             userInfo = ReadJSON(uid + '/botInfo.json')
             userInfo['login'] = login
             userInfo['password'] = pasw
             userInfo['jwtToken'] = responseJson.get('access_token')
-            userInfo['jwtExpiries'] = responseJson.get('expires_in_access')
             userInfo['jwtExpiries'] = responseJson.get('expires_in_access')
             if message.chat.type != 'private':
                 userInfo['chat_type'] = message.chat.type
@@ -1286,7 +1323,7 @@ def echo_message(message):
 
             except Exception as e:
                 print("Error", e)
-                send_message(uid, "Мы вошли в ваш аккаунт, но при получении допонительных данных произошла ошибка. Вы можете попробовать ещё раз или игнорировать это.\n(api/v2/settings/u-i: get() error)")
+                send_message(uid, "Мы вошли в ваш аккаунт, но при получении допонительных данных произошла ошибка. Вы можете попробовать ещё раз или игнорировать это.\n(api/v2/settings/u-i: requests.get () error)")
 
             SaveJSON(uid + '/botInfo.json', userInfo)
             SetWaitForLoginData(uid, False)
