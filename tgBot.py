@@ -993,8 +993,8 @@ def fetchDate(message, Relaunch=False, Sended=None):
         operationDay = datetime.today()
         showingText = "сегодня"
 
-        if lastJwt is None or expiration_timestamp is None:
-            ReAuthInSystem(message)
+        if lastJwt is None:
+            lastJwt = ReAuthInSystem(message)
 
         if strClear(message.text).isdigit():
             try:
@@ -1340,6 +1340,36 @@ def echo_message(message):
         if True:
             if '!пары' in message.text.lower() or '!gfhs' in message.text.lower() or '!расписание' in message.text.lower() or (GetUseTextContext(message.chat.id) and 'пары' in message.text.lower()):
                 fetchDate(message)
+
+
+@bot.message_handler(commands=['dynamicmessage'])
+def DynamicMessage(message):
+    uid = str(message.chat.id)
+    forum = isForum(message)
+    botin = ReadJSON(uid + '/botInfo.json')
+    DynamicChatID = botin.get('DynamicChatID')
+    DynamicForumID = botin.get('DynamicForumID')
+    DynamicChatMessage = botin.get('DynamicID')
+    Message = None
+    if DynamicChatMessage is None or DynamicForumID is None or DynamicChatID is None:
+        Message = bot.send_message(uid, text="Пару минут...", message_thread_id=forum)
+        DynamicChatMessage, botin['DynamicID'] = 2 * [Message.message_id]
+        DynamicChatID, botin['DynamicChatID'] = 2 * [uid]
+        DynamicForumID, botin['DynamicForumID'] = 2 * [forum]
+        SaveJSON(uid+'botInfo.json', botin)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
