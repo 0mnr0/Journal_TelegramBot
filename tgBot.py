@@ -296,7 +296,7 @@ def send_welcome(message):
             keyboard.add(auth_button)
             bot.send_message(message.chat.id,
                 text="Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте.",
-                reply_markup=keyboard, message_thread_id=forum)
+                reply_markup=keyboard, message_thread_id=forum, disable_notification=True)
         else:
 
 
