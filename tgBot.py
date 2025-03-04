@@ -957,16 +957,17 @@ def fetchDate(message, Relaunch=False, Sended=None):
             )
         time.sleep(7)
     else:
-        if ThreePercentChance():
-            with open("EasterEggs/walter_black.jpg", "rb") as photo:
-                bot.send_photo(
-                    chat_id=message.chat.id,
-                    photo=photo,
-                    caption="Nuh, i dont want to do it",
-                    message_thread_id=forum,
-                    reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
-                )
-            time.sleep(5)
+        if False:
+            if ThreePercentChance():
+                with open("EasterEggs/walter_black.jpg", "rb") as photo:
+                    bot.send_photo(
+                        chat_id=message.chat.id,
+                        photo=photo,
+                        caption="Nuh, i dont want to do it",
+                        message_thread_id=forum,
+                        reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
+                    )
+                time.sleep(5)
 
 
 
