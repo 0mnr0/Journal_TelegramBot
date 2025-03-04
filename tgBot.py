@@ -299,10 +299,10 @@ def UserRegister(userId, msgType):
 def send_welcome(message):
     forum = isForum(message)
 
-    if UserRegister(message.chat.id, message.chat.type) == False:
+    if not UserRegister(message.chat.id, message.chat.type):
         keyboard = types.InlineKeyboardMarkup()
 
-        if isMessageFromGroup(message) == False:
+        if not isMessageFromGroup(message):
             auth_button = types.InlineKeyboardButton(text="Авторизоваться", callback_data=f"auth:{message.chat.id}")
             keyboard.add(auth_button)
             bot.send_message(message.chat.id,
@@ -313,12 +313,12 @@ def send_welcome(message):
 
             additionalText = '\n\nID Группы: `'+str(message.chat.id)+'`.\nЗапомните ID выше и нажмите кнопку ниже, чтобы авторизовать бота в группе через личные сообщения (Обычная авторизация в группе недоступна из-за соображений безопасности).'
             send_message(message.chat.id,
-                         "Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте. " + additionalText, message_thread_id=forum)
+                         "Привет! Этот бот показывает расписание для вашего аккунта в Journal. Для этого нужна авторизация вашего аккунта в боте. " + additionalText, message_thread_id=forum, disable_notification=True)
 
             keyboard = types.InlineKeyboardMarkup()
             auth_button = types.InlineKeyboardButton(text="Авторизовать группу", callback_data=f"groupAuth:{message.chat.id}")
             keyboard.add(auth_button)
-            send_message(message.chat.id, "*Для нормальной работы бота выдайте ему роль администраотра*\n*Для того чтобы кнопка работала напишите ему в личные сообщения*\n\nАвторизация не доступна в группе. Используйте кнопку ниже для привязки аккаунту к группе:", reply_markup=keyboard, message_thread_id=forum)
+            send_message(message.chat.id, "*Для нормальной работы бота выдайте ему роль администраотра*\n*Для того чтобы кнопка работала напишите ему в личные сообщения*\n\nАвторизация не доступна в группе. Используйте кнопку ниже для привязки аккаунту к группе:", reply_markup=keyboard, message_thread_id=forum, disable_notification=True)
 
 
 # Функция для проверки прав администратора
@@ -420,7 +420,7 @@ def makeAuth(message, messageIsAnId=False):
 Начнём авторизацию. Чтобы авторизоваться в сервисе нужно указать логин, поставить запятую и указать пароль.\nПример:```MyLogin_ab01,Password12345!```\n\n
 Если по каким-то причинам вы не можете авторизоваться через бота выполните команду /auth через какое-то время.
 С текущего момента все сообщения которые вы пришлёте будут считаться как данные авторизации до тех пор пока вы не пришлёте корректные данные авторизации или не выполните комманду /cancelauth (отмена ожидания авторизации)
-        """)
+        """, disable_notification=True)
     ui = ReadBotJson(user)
     ui['WaitForAuth'] = True
     SaveJSON(user + '/botInfo.json', ui)
@@ -455,7 +455,7 @@ def send_toggle_button(message):
     markup.add(telebot.types.InlineKeyboardButton(btn_text, callback_data="toggleTextContext"))
     yesAwnser = "*Да*\n\nБот будет присылать расписание даже без команды.\nНапример: какие сегодня *пары*?"
     noAwnser = "*Нет*\n\nБот не покажет расписание без команды.\nПример: какие сегодня *пары*? - не сработает\nПример: какие сегодня *!пары*? - сработает"
-    bot.send_message(message.chat.id, telegramify_markdown.markdownify(f'Использовать текст в сообщении для активации бота: {yesAwnser if config == True else noAwnser}'), reply_markup=markup, parse_mode="MarkdownV2")
+    bot.send_message(message.chat.id, telegramify_markdown.markdownify(f'Использовать текст в сообщении для активации бота: {yesAwnser if config == True else noAwnser}'), reply_markup=markup, parse_mode="MarkdownV2", disable_notification=True)
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "toggleTextContext")
@@ -1201,8 +1201,8 @@ def stateGroupAuth(call):
                         SaveFileByList(uid+ '/list.inf', listOfAuthGroups)
 
 
-                    send_message(call.from_user.id, "Благодарим за активацию данных бота, мы постараемся не говорить кто активировал бота в группе :)")
-                    send_message(groupId, "Кто-то успешно зарегестрировал бота в группе (ID:" + (str(groupId)) + ')', disable_notification=True)
+                    send_message(call.from_user.id, "Благодарим за активацию данных бота, мы не будем говорить кто активировал бота в группе :)")
+                    send_message(groupId, "Бот для этой группы активирован (ID:" + (str(groupId)) + ')', disable_notification=True)
                 else:
                     send_message(call.from_user.id, "Ваши данные не зарегистрированы. Пожалуйста, выполните комманду /auth а затем зарегистрируйте бота в группе")
             else:
@@ -1211,7 +1211,7 @@ def stateGroupAuth(call):
             bot.send_message(call.from_user.id, "Кто-то уже привязал группу. Выполнить действие невозможно.")
     else:
         if not isUserBanned(call.from_user.id):
-            bot.send_message(call.from_user.id, "Как скажете, если передумаете - просто нажмите кнопку \"Да\" выше")
+            bot.send_message(call.from_user.id, "Как скажете, но если передумаете - просто нажмите кнопку \"Да\" выше")
 
 
 
