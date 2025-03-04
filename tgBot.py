@@ -5,7 +5,6 @@ from telebot.types import ReactionTypeEmoji, InlineKeyboardButton, InlineKeyboar
 import telegramify_markdown
 from telegramify_markdown import customize
 from dateProcessor import *
-import logging
 import json
 import os
 from databases import *
@@ -52,24 +51,11 @@ def isForum(message):
         forum = message.message_thread_id
     return forum
 
-logFile = "botLogs.txt"
-
-if os.path.exists(logFile):
-    os.remove(logFile)
-
-# Настройка логирования
-logging.basicConfig(
-    filename=logFile,
-    level=logging.DEBUG,          # Уровень логирования (DEBUG для записи всех событий)
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Формат сообщения
-    datefmt='%Y-%m-%d %H:%M:%S'   # Формат времени
-)
 
 userFolderPath = 'userInfo'
 
 API_TOKEN = open('tkn.ini', 'r').read()
 bot = telebot.TeleBot(API_TOKEN)
-logger = logging.getLogger('TeleBot').setLevel(logging.INFO)
 
 
 moscowTime = datetime.now()
@@ -1409,6 +1395,6 @@ while True:
         bot.infinity_polling()
         print("Pooled")
     except Exception as e:
-        logging.error(f"Ошибка подключения: {e} Relaunching...")
+        print(f"Ошибка подключения: {e} Relaunching...")
 
     time.sleep(1)
