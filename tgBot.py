@@ -109,6 +109,9 @@ def SaveFile(pathToFile, text):
     with open(pathToFile, 'w', encoding='utf-8') as f:
         f.write(text)
 
+def isGroupChat(message):
+    return message.chat.type != "private"
+
 def SaveFileByList(pathToFile, list):
     pathToFile = userFolderPath + '/' + pathToFile
     with open(pathToFile, 'w', encoding='utf-8') as f:
@@ -1238,9 +1241,12 @@ def echo_message(message):
     uid = str(message.chat.id)
     text = message.text
     ui = ReadBotJson(uid)
+    isGroup = isGroupChat(message)
 
-    if not IsUserRegistered(uid) and ui is not None and ui.get('WaitForAuth') == False:
+    if not IsUserRegistered(uid) and ui is not None and ui.get('WaitForAuth') == False and not isGroup:
         send_welcome(message)
+        return
+    if not IsUserRegistered(uid) and isGroup:
         return
     if ui is None:
         send_welcome(message)
