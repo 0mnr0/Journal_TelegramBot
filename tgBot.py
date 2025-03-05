@@ -935,7 +935,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
     uid = str(message.chat.id)
     forum = isForum(message)
-    if not is_admin(message.chat.id):
+    if isGroupChat(message) and not is_admin(message.chat.id):
         bot.reply_to(message, text="Бот не может работать без прав администратора :(", message_thread_id=forum)
 
     if isFirstApril() and not Relaunch:
