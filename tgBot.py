@@ -217,8 +217,6 @@ lastTimeSended = None
 alreadyNotified = []
 maxLengthOfUsers = 0
 def backgroundSend():
-
-
     global lastTimeSended
     while True:
         try:
@@ -1096,6 +1094,10 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
 
                     finalText = "Пары на *" + showingText + "*:\n\n" + finalText
+
+                    if finalText.count("Миненко Алексей Павлович") > 2:   # P.S. Это наш легендарный учитель, не буду врать
+                        finalText += "\n 🔥 Имба, NGL!"
+
                     converted = telegramify_markdown.markdownify(
                         finalText,
                         max_line_length=None,
