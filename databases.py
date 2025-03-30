@@ -34,8 +34,6 @@ def clear_user_notify_list(uid):
 
 def get_users_by_notification_time(time):
     notifications = collection.find({"time": time})
-    print(time)
-    print(notifications)
 
     if notifications.collection.count_documents({"time": time}) == 0:
         return []
