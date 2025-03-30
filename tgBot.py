@@ -211,7 +211,7 @@ def cleanNotifyList(uid):
         for userId in os.listdir(userFolderPath+'/notifyList/'+time):
             if userId == uid:
                 os.rmdir(userFolderPath+'/notifyList/'+time+'/'+userId)
-                send_message(uid, "*Notifier*: \nУведомления для времени \""+time.replace("_",":")+"\" отключены", disable_notification=True)
+                send_message(uid, "*Notifier*: \nПостоянные уведомления отключены", disable_notification=True)
 
 lastTimeSended = None
 alreadyNotified = []
@@ -1343,12 +1343,13 @@ def echo_message(message):
         SetWaitForLoginData(uid, False)
         args = text.split(" ")
         userTime = args[0].replace(' ','').replace('silent','').replace('.',':').replace('_',':')
+        origTime = userTime
 
-        userTime = (datetime.strptime(userTime, "%H:%M") + timedelta(hours=getGmtCorrection(uid))).strftime("%H:%M")
+        userTime = (datetime.strptime(userTime, "%H:%M") - +timedelta(hours=getGmtCorrection(uid))).strftime("%H:%M")
         if is_valid_time(userTime):
             ###
             cleanNotifyList(uid)
-            send_message(uid, "Уведомления успешно активированы. Время уведомлений: " + userTime)
+            send_message(uid, "Уведомления успешно активированы. Время уведомлений: " + origTime)
 
             userBotInfo = ReadJSON(uid + '/botInfo.json')
             additionalDay = 0
