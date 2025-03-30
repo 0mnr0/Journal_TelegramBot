@@ -1,20 +1,19 @@
-import random
-from threading import *
-
-from telebot.types import ReactionTypeEmoji, InlineKeyboardButton, InlineKeyboardMarkup
-import telegramify_markdown
-from telegramify_markdown import customize
-from dateProcessor import *
 import json
 import os
-from databases import *
+import random
+import shutil
 import time
 from datetime import datetime, timedelta
+from threading import *
+
 import requests
 import telebot
-import shutil
+import telegramify_markdown # 0.4.2 Supported only
 from telebot import types
+from telebot.types import ReactionTypeEmoji, InlineKeyboardButton, InlineKeyboardMarkup
 
+from databases import *
+from dateProcessor import *
 
 #Version 1.1
 
@@ -1034,19 +1033,34 @@ def fetchDate(message, Relaunch=False, Sended=None):
             # Example of url by finding a day:
             #https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
 
+            Tries = 1
+            FixedByCycle = False
             operationDay = operationDay
             fetchResult = get(basicUrl+operationDay, lastJwt)
+            if fetchResult.status_code != 200:
+                Tries += 1
+                for i in range(4):
+                    fetchResult = get(basicUrl+operationDay, ReAuthInSystem(message))
+                    if fetchResult.status_code == 200:
+                        FixedByCycle = True
+                        break
+                    else:
+                        time.sleep(0.3)
+
+
             if fetchResult.status_code == 200:
                 jsonResult = fetchResult.json()
 
                 finalText = ""
                 for lesson in jsonResult:
-
                     finalText += '>*Пара ' + str(lesson.get('lesson')) + ':  '+lesson.get('teacher_name')+'*\n'
                     finalText += '```\n' + lesson.get('subject_name') + "\n"
                     finalText += lesson.get('started_at')+" - "+lesson.get('finished_at')+" ("+lesson.get('room_name')+")\n"
                     finalText += "```\n"
 
+
+                if len(finalText) > 0 and FixedByCycle:
+                    finalText += f"\n\n*Использован патч исправления пустого расписания (LuckyTry: {str(Tries)} / 5)*"
 
                 if sended_msg is not None:
                     try:
