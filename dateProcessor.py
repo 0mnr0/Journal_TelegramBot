@@ -1,5 +1,49 @@
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
+
+daysList = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
+days_variants = {
+    "понедельник": ["понедельник", "пн"],
+    "вторник": ["вторник", "вт"],
+    "среда": ["среда", "среду", "ср"],
+    "четверг": ["четверг", "чт"],
+    "пятница": ["пятница", "пятницу", "пт"],
+    "суббота": ["суббота", "субботу", "сб"],
+    "воскресенье": ["воскресенье", "вс"]
+}
+daysVariants = [variant for variants in days_variants.values() for variant in variants]
+days_map = {variant: day for day, variants in days_variants.items() for variant in variants}
+
+
+def IsDateTimeInMessage(txt):
+    words = txt.lower().split()
+    for word in words:
+        if word in daysVariants:
+            return True
+    return False
+
+
+def getDateByText(txt: str, now: datetime) -> datetime:
+    words = txt.lower().split()
+
+    # Поиск дня недели в тексте (с учетом склонений)
+    searchingDay = None
+    for word in words:
+        if word in days_map:
+            searchingDay = days_map[word]
+            break
+    print ("searchingDay:", searchingDay)
+    if searchingDay is None:
+        return now
+
+    dayIndex = list(days_variants.keys()).index(searchingDay)
+    currentIndex = now.weekday()
+
+    days_ahead = (dayIndex - currentIndex) % 7
+    if days_ahead == 0:
+        days_ahead += 7
+
+    return now + timedelta(days=days_ahead)
 
 
 #Making check if user says "/shed +1" for next day or etc
