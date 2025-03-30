@@ -1122,10 +1122,10 @@ def fetchDate(message, Relaunch=False, Sended=None):
                             ExamsToday = False
                             for exam in userExams:
                                 if exam.get('date') == operationDay and not ExamsToday:
-                                    examsText += "\n"
+                                    examsText += "\n Экзамены:\n"
                                 if exam.get('date') == operationDay:
                                     ExamsToday = True
-                                    examsText += f"Замечен экзамен: *\"{exam.get('spec')}\"*\n"
+                                    examsText += f">*\"{exam.get('spec')}\"*\n"
 
 
                         examText = telegramify_markdown.markdownify(

@@ -32,7 +32,6 @@ def getDateByText(txt: str, now: datetime) -> datetime:
         if word in days_map:
             searchingDay = days_map[word]
             break
-    print ("searchingDay:", searchingDay)
     if searchingDay is None:
         return now
 
