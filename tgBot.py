@@ -1012,6 +1012,8 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     operationDay = datetime.today() - timedelta(days=int(dayNum))
                     showingText = operationDay.strftime('%Y-%m-%d')
 
+
+
             def correctDatetimeType(date_value):
                 if isinstance(date_value, str):
                     return datetime.strptime(date_value, "%Y-%m-%d")
@@ -1019,6 +1021,11 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
             operationDay = correctDatetimeType(operationDay)
             operationDay = operationDay + timedelta(hours=getGmtCorrection(uid))
+
+
+            if IsDateTimeInMessage(message.text):
+                operationDay = getDateByText(message.text, operationDay)
+                showingText = operationDay.strftime('%Y-%m-%d')
 
             if "послезавтра" in message.text.lower():
                 operationDay = operationDay+timedelta(days=2)
@@ -1040,18 +1047,15 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
 
             if lastJwt is not None:
-                #JWT Key Is Still Valid
+                # JWT Key Is Still Valid
                 # Example of url by finding a day:
-                #https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
+                # https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
 
                 Tries = 1
                 FixedByCycle = False
                 operationDay = operationDay
                 fetchResult = get(basicUrl+operationDay, lastJwt)
-                userExams = get('https://msapi.top-academy.ru/api/v2/dashboard/info/future-exams', lastJwt)
-                if fetchResult.status_code == 200:
-                    userExams = userExams.json()
-                else: userExams = []
+
 
 
                 if fetchResult.status_code != 200:
@@ -1069,17 +1073,7 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     jsonResult = fetchResult.json()
 
                     finalText = ""
-                    try:
-                        if len(userExams) > 0:
-                            ExamsToday = False
-                            for exam in userExams:
-                                if exam.get('date') == operationDay:
-                                    ExamsToday = True
-                                    finalText += f"Замечен экзамен: *\"{exam.get('spec')}\"*\n"
-                            if ExamsToday:
-                                finalText += "\n\n"
-                    except Exception as e:
-                        print(e)
+
 
                     for lesson in jsonResult:
                         finalText += '>*Пара ' + str(lesson.get('lesson')) + ':  '+lesson.get('teacher_name')+'*\n'
@@ -1107,10 +1101,50 @@ def fetchDate(message, Relaunch=False, Sended=None):
                         max_line_length=None,
                         normalize_whitespace=False
                     )
+
+                    newMsg = None
                     try:
                         bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=converted, parse_mode='MarkdownV2')
                     except:
-                        bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum)
+                        sended_msg = bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum)
+
+                    userExams = get('https://msapi.top-academy.ru/api/v2/dashboard/info/future-exams', lastJwt)
+                    if fetchResult.status_code == 200:
+                        userExams = userExams.json()
+                    else:
+                        userExams = []
+
+                    ### Exams Check
+
+                    examsText = ""
+                    try:
+                        if len(userExams) > 0:
+                            ExamsToday = False
+                            for exam in userExams:
+                                if exam.get('date') == operationDay and not ExamsToday:
+                                    examsText += "\n"
+                                if exam.get('date') == operationDay:
+                                    ExamsToday = True
+                                    examsText += f"Замечен экзамен: *\"{exam.get('spec')}\"*\n"
+
+
+                        examText = telegramify_markdown.markdownify(
+                            finalText+examsText,
+                            max_line_length=None,
+                            normalize_whitespace=False
+                        )
+
+                        try:
+                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText, parse_mode='MarkdownV2')
+                        except Exception as e:
+                            raise e
+
+                    except Exception as e:
+                        print(e)
+
+
+
+
                 else:
                     if not Relaunch:
                         ClearCachedJWT(uid)
@@ -1126,7 +1160,9 @@ def fetchDate(message, Relaunch=False, Sended=None):
                 else:
                     send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом... (lastJwt is None)", message_thread_id=forum)
     except Exception as e:
-        bot.reply_to(message, str(e), parse_mode='MarkdownV2')
+        er = telegramify_markdown.markdownify(str(e), max_line_length=None, normalize_whitespace=False)
+        bot.reply_to(message, er, parse_mode='MarkdownV2')
+        raise e
 
 
 
