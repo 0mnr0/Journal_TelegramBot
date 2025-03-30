@@ -1081,7 +1081,6 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     except Exception as e:
                         print(e)
 
-                    print("jsonResult:", jsonResult)
                     for lesson in jsonResult:
                         finalText += '>*Пара ' + str(lesson.get('lesson')) + ':  '+lesson.get('teacher_name')+'*\n'
                         finalText += '```\n' + lesson.get('subject_name') + "\n"
@@ -1098,8 +1097,6 @@ def fetchDate(message, Relaunch=False, Sended=None):
                             return
                         except: pass
 
-                    print("Check len of finalText: ", len(finalText))
-                    print("finalText: ", finalText)
                     if len(finalText) == 0:
                         finalText="В этот день ничего нет :D"
 
