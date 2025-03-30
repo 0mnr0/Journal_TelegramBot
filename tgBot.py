@@ -3,6 +3,7 @@ import os
 import random
 import shutil
 import time
+import calendar
 from datetime import datetime, timedelta
 from threading import *
 
@@ -16,6 +17,8 @@ from databases import *
 from dateProcessor import *
 
 #Version 1.1
+days = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
+
 
 
 AdaptiveSchedule = db['AdaptiveSchedule']
@@ -582,7 +585,7 @@ def ReAuthInSystem(message=None, uidNotMessage=None):
             SaveJSON(uid + '/botInfo.json', userInfo)
             return tkn
         else:
-            return "null (au.stcode)"
+            return None
     else:
         bot.reply_to(message, "Для начала привяжите ваши данные в боте: /auth")
         return None
@@ -934,199 +937,230 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
     uid = str(message.chat.id)
     forum = isForum(message)
-    if isGroupChat(message) and not is_admin(message.chat.id):
-        bot.reply_to(message, text="Бот не может работать без прав администратора :(", message_thread_id=forum)
 
-    if isFirstApril() and not Relaunch:
-        with open("EasterEggs/shedule_in_4k.jpg", "rb") as photo:
-            bot.send_photo(
-                chat_id=message.chat.id,
-                photo=photo,
-                caption="Вот расписание на указанный день!",
-                message_thread_id=forum,
-                reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
-            )
-        time.sleep(7)
-    else:
-        if False:
-            if ThreePercentChance():
-                with open("EasterEggs/walter_black.jpg", "rb") as photo:
-                    bot.send_photo(
-                        chat_id=message.chat.id,
-                        photo=photo,
-                        caption="Nuh, i dont want to do it",
-                        message_thread_id=forum,
-                        reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
-                    )
-                time.sleep(5)
+    try:
+        if isGroupChat(message) and not is_admin(message.chat.id):
+            bot.reply_to(message, text="Бот не может работать без прав администратора :(", message_thread_id=forum)
 
-
-
-
-    if IsUserRegistered(uid):
-
-        if isUserBanned(message.from_user.id):
-            return
-
-
-        bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👀')], is_big=False)
-
-
-        global showingText
-        global operationDay
-        sended_msg = Sended
-        if not Relaunch:
-            sended_msg = send_message(uid, "Секунду, ищем расписание...", disable_notification=True, message_thread_id=forum)
-
-        uiInfo = ReadBotJson(uid)
-        expiration_timestamp = uiInfo.get('jwtExpiries')
-        lastJwt = uiInfo.get('jwtToken')
-        basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
-        operationDay = datetime.today()
-        showingText = "сегодня"
-
-        if lastJwt is None:
-            lastJwt = ReAuthInSystem(message)
-
-        if strClear(message.text).isdigit():
-            try:
-                maybeItsADay = clearDate(message.text)
-                convertedDate = parse_date(maybeItsADay)
-                operationDay = convertedDate
-                showingText = convertedDate
-            except Exception as e:
-                operationDay = datetime.today()
-                showingText = "сегодня"
-
-        if isItPlusOperation(message.text):
-            operation, dayNum = getTextOperation(message.text)
-            if operation == "+":
-                operationDay = datetime.today() + timedelta(days=int(dayNum))
-                showingText = operationDay.strftime('%Y-%m-%d')
-            elif operation == "-":
-                operationDay = datetime.today() - timedelta(days=int(dayNum))
-                showingText = operationDay.strftime('%Y-%m-%d')
-
-
-        operationDay = operationDay + timedelta(hours=getGmtCorrection(uid))
-        if "послезавтра" in message.text.lower():
-            operationDay = operationDay+timedelta(days=2)
-            showingText = f"послезавтра ({operationDay.strftime('%Y-%m-%d')})"
-        elif "завтра" in message.text.lower() or "завтрв" in message.text.lower():
-            operationDay = operationDay + timedelta(days=1)
-            showingText = f"завтра ({operationDay.strftime('%Y-%m-%d')})"
-        elif "вчера" in message.text.lower():
-            operationDay = operationDay-timedelta(days=1)
-            showingText = f"вчера ({operationDay.strftime('%Y-%m-%d')})"
-
-
-
-        if type(operationDay) != str:
-            operationDay = operationDay.strftime('%Y-%m-%d')
-
-
-        if expiration_timestamp is None:
-            expiration_timestamp = time.time()+10
-
-        if lastJwt is not None:
-            #JWT Key Is Still Valid
-            # Example of url by finding a day:
-            #https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
-
-            Tries = 1
-            FixedByCycle = False
-            operationDay = operationDay
-            fetchResult = get(basicUrl+operationDay, lastJwt)
-            if fetchResult.status_code != 200:
-                Tries += 1
-                for i in range(4):
-                    fetchResult = get(basicUrl+operationDay, ReAuthInSystem(message))
-                    if fetchResult.status_code == 200:
-                        FixedByCycle = True
-                        break
-                    else:
-                        time.sleep(0.3)
-
-
-            if fetchResult.status_code == 200:
-                jsonResult = fetchResult.json()
-
-                finalText = ""
-                for lesson in jsonResult:
-                    finalText += '>*Пара ' + str(lesson.get('lesson')) + ':  '+lesson.get('teacher_name')+'*\n'
-                    finalText += '```\n' + lesson.get('subject_name') + "\n"
-                    finalText += lesson.get('started_at')+" - "+lesson.get('finished_at')+" ("+lesson.get('room_name')+")\n"
-                    finalText += "```\n"
-
-
-                if len(finalText) > 0 and FixedByCycle:
-                    finalText += f"\n\n*Использован патч исправления пустого расписания (LuckyTry: {str(Tries)} / 5)*"
-
-                if sended_msg is not None:
-                    try:
-                        bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" +finalText, parse_mode='MarkdownV2')
-                        return
-                    except: pass
-
-
-                if len(finalText) == 0:
-                    finalText="В этот день ничего нет :D"
-
-                finalText = "Пары на *" + showingText + "*:\n\n" + finalText
-                converted = telegramify_markdown.markdownify(
-                    finalText,
-                    max_line_length=None,
-                    normalize_whitespace=False
+        if isFirstApril() and not Relaunch:
+            with open("EasterEggs/shedule_in_4k.jpg", "rb") as photo:
+                bot.send_photo(
+                    chat_id=message.chat.id,
+                    photo=photo,
+                    caption="Вот расписание на указанный день!",
+                    message_thread_id=forum,
+                    reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
                 )
+            time.sleep(7)
+        else:
+            if False:
+                if ThreePercentChance():
+                    with open("EasterEggs/walter_black.jpg", "rb") as photo:
+                        bot.send_photo(
+                            chat_id=message.chat.id,
+                            photo=photo,
+                            caption="Nuh, i dont want to do it",
+                            message_thread_id=forum,
+                            reply_to_message_id=message.message_id  # Ответ на сообщение пользователя
+                        )
+                    time.sleep(5)
+
+
+
+
+        if IsUserRegistered(uid):
+
+            if isUserBanned(message.from_user.id):
+                return
+
+
+            bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('👀')], is_big=False)
+
+
+            global showingText
+            global operationDay
+            sended_msg = Sended
+            if not Relaunch:
+                sended_msg = send_message(uid, "Секунду, ищем расписание...", disable_notification=True, message_thread_id=forum)
+
+            uiInfo = ReadBotJson(uid)
+            lastJwt = uiInfo.get('jwtToken')
+            basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='
+            operationDay = datetime.today()
+            showingText = "сегодня"
+
+            newJwt = ReAuthInSystem(message)
+            if type(newJwt) == str:
+                lastJwt = newJwt
+
+            if strClear(message.text).isdigit():
                 try:
-                    bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=converted, parse_mode='MarkdownV2')
-                except:
-                    bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum)
+                    maybeItsADay = clearDate(message.text)
+                    convertedDate = parse_date(maybeItsADay)
+                    operationDay = convertedDate
+                    showingText = convertedDate
+                except Exception as e:
+                    operationDay = datetime.today()
+                    showingText = "сегодня"
+
+            if isItPlusOperation(message.text):
+                operation, dayNum = getTextOperation(message.text)
+                if operation == "+":
+                    operationDay = datetime.today() + timedelta(days=int(dayNum))
+                    showingText = operationDay.strftime('%Y-%m-%d')
+                elif operation == "-":
+                    operationDay = datetime.today() - timedelta(days=int(dayNum))
+                    showingText = operationDay.strftime('%Y-%m-%d')
+
+            def correctDatetimeType(date_value):
+                if isinstance(date_value, str):
+                    return datetime.strptime(date_value, "%Y-%m-%d")
+                return date_value
+
+            operationDay = correctDatetimeType(operationDay)
+            operationDay = operationDay + timedelta(hours=getGmtCorrection(uid))
+
+            if "послезавтра" in message.text.lower():
+                operationDay = operationDay+timedelta(days=2)
+                showingText = f"послезавтра"
+            elif "завтра" in message.text.lower() or "завтрв" in message.text.lower():
+                operationDay = operationDay + timedelta(days=1)
+                showingText = f"завтра"
+            elif "вчера" in message.text.lower():
+                operationDay = operationDay-timedelta(days=1)
+                showingText = f"вчера"
+
+
+            if type(operationDay) != str:
+                operationDay = operationDay.strftime('%Y-%m-%d')
+
+            date_object = datetime.strptime(operationDay, "%Y-%m-%d")
+            day_of_week = days[date_object.weekday()]
+            showingText += f" ({day_of_week})"
+
+
+            if lastJwt is not None:
+                #JWT Key Is Still Valid
+                # Example of url by finding a day:
+                #https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter= YYYY - MM - DD
+
+                Tries = 1
+                FixedByCycle = False
+                operationDay = operationDay
+                fetchResult = get(basicUrl+operationDay, lastJwt)
+                userExams = get('https://msapi.top-academy.ru/api/v2/dashboard/info/future-exams', lastJwt)
+                if fetchResult.status_code == 200:
+                    userExams = userExams.json()
+                else: userExams = []
+
+
+                if fetchResult.status_code != 200:
+                    Tries += 1
+                    for i in range(4):
+                        fetchResult = get(basicUrl+operationDay, ReAuthInSystem(message))
+                        if fetchResult.status_code == 200:
+                            FixedByCycle = True
+                            break
+                        else:
+                            time.sleep(0.3)
+
+
+                if fetchResult.status_code == 200:
+                    jsonResult = fetchResult.json()
+
+                    finalText = ""
+                    try:
+                        if len(userExams) > 0:
+                            ExamsToday = False
+                            for exam in userExams:
+                                if exam.get('date') == operationDay:
+                                    ExamsToday = True
+                                    finalText += f"Замечен экзамен: *\"{exam.get('spec')}\"*\n"
+                            if ExamsToday:
+                                finalText += "\n\n"
+                    except Exception as e:
+                        print(e)
+
+                    print("jsonResult:", jsonResult)
+                    for lesson in jsonResult:
+                        finalText += '>*Пара ' + str(lesson.get('lesson')) + ':  '+lesson.get('teacher_name')+'*\n'
+                        finalText += '```\n' + lesson.get('subject_name') + "\n"
+                        finalText += lesson.get('started_at')+" - "+lesson.get('finished_at')+" ("+lesson.get('room_name')+")\n"
+                        finalText += "```\n"
+
+
+                    if len(finalText) > 0 and FixedByCycle:
+                        finalText += f"\n\n*Успешно выполнен патч исправления пустого расписания (LuckyTry: {str(Tries)} / 5)*"
+
+                    if sended_msg is not None:
+                        try:
+                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" +finalText, parse_mode='MarkdownV2')
+                            return
+                        except: pass
+
+                    print("Check len of finalText: ", len(finalText))
+                    print("finalText: ", finalText)
+                    if len(finalText) == 0:
+                        finalText="В этот день ничего нет :D"
+
+
+                    finalText = "Пары на *" + showingText + "*:\n\n" + finalText
+                    converted = telegramify_markdown.markdownify(
+                        finalText,
+                        max_line_length=None,
+                        normalize_whitespace=False
+                    )
+                    try:
+                        bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=converted, parse_mode='MarkdownV2')
+                    except:
+                        bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum)
+                else:
+                    if not Relaunch:
+                        ClearCachedJWT(uid)
+                        bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
+                        fetchDate(message, True, sended_msg)
+                    else:
+                        send_message(message.chat.id, f"Не удалось загрузить расписание. Что-то с JWT ключом... (FetchAPI Result Code: {fetchResult.status_code})", message_thread_id=forum)
             else:
                 if not Relaunch:
                     ClearCachedJWT(uid)
                     bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
                     fetchDate(message, True, sended_msg)
                 else:
-                    send_message(message.chat.id, f"Не удалось загрузить расписание. Что-то с JWT ключом... (FetchAPI Result Code: {fetchResult.status_code})", message_thread_id=forum)
-        else:
-            if not Relaunch:
-                ClearCachedJWT(uid)
-                bot.delete_message(message_id=sended_msg.message_id, chat_id=message.chat.id)
-                fetchDate(message, True, sended_msg)
-            else:
-                send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом... (lastJwt is None)", message_thread_id=forum)
+                    send_message(message.chat.id, "Не удалось загрузить расписание. Что-то с JWT ключом... (lastJwt is None)", message_thread_id=forum)
+    except Exception as e:
+        bot.reply_to(message, str(e), parse_mode='MarkdownV2')
 
 
 
 @bot.message_handler(commands=['cleanauthingroups'])
 def globalCleaner(message):
-    uid = str(message.chat.id)
-    if not isMessageFromGroup(message):
-        if os.path.exists(userFolderPath + '/' + uid + '/list.inf'):
-            userConnectedGroups = ReadFile(uid + '/list.inf').split("\n")
-            for groupid in userConnectedGroups:
-                if os.path.exists(userFolderPath + '/' + groupid) and groupid != '':
-                    try:
-                        groupInt = int(groupid)
-                        userConnectedGroups.remove(groupid)
-                        SaveFileByList(uid + '/list.inf', userConnectedGroups)
+        uid = str(message.chat.id)
+        if not isMessageFromGroup(message):
+            if os.path.exists(userFolderPath + '/' + uid + '/list.inf'):
+                userConnectedGroups = ReadFile(uid + '/list.inf').split("\n")
+                for groupid in userConnectedGroups:
+                    if os.path.exists(userFolderPath + '/' + groupid) and groupid != '':
+                        try:
+                            groupInt = int(groupid)
+                            userConnectedGroups.remove(groupid)
+                            SaveFileByList(uid + '/list.inf', userConnectedGroups)
 
-                        groupBotData = ReadJSON(groupid + '/botInfo.json')
-                        groupBotData['login'] = None
-                        groupBotData['password'] = None
-                        groupBotData['jwtToken'] = None
-                        groupBotData['jwtExpiries'] = None
-                        SaveJSON(groupid + '/botInfo.json', groupBotData)
-                        send_message(uid, "Авторизация для группы *"+groupid+"* очищена. Групп с вашей авторизацией осталось: "+(str(len(userConnectedGroups))))
-                        send_message(groupInt, """Авторизация для этой группы была отозвана. Используйте комманду /auth чтобы зарегистрировать этого бота.""")
-                    except Exception as e:
-                        send_message(uid, e)
+                            groupBotData = ReadJSON(groupid + '/botInfo.json')
+                            groupBotData['login'] = None
+                            groupBotData['password'] = None
+                            groupBotData['jwtToken'] = None
+                            groupBotData['jwtExpiries'] = None
+                            SaveJSON(groupid + '/botInfo.json', groupBotData)
+                            send_message(uid, "Авторизация для группы *"+groupid+"* очищена. Групп с вашей авторизацией осталось: "+(str(len(userConnectedGroups))))
+                            send_message(groupInt, """Авторизация для этой группы была отозвана. Используйте комманду /auth чтобы зарегистрировать этого бота.""")
+                        except Exception as e:
+                            send_message(uid, e)
 
+            else:
+                send_message(uid, "У вас нет ни одной привязанной группы!")
         else:
-            send_message(uid, "У вас нет ни одной привязанной группы!")
-    else:
-        bot.reply_to(message, "Вы не можете использовать эту комманду в группах!")
+            bot.reply_to(message, "Вы не можете использовать эту комманду в группах!")
 
 
 @bot.message_handler(commands=['cleanauthbyid'])
