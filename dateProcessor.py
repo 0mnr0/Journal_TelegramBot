@@ -16,7 +16,11 @@ days_map = {variant: day for day, variants in days_variants.items() for variant 
 
 
 def IsDateTimeInMessage(txt):
-    words = txt.lower().split()
+    disallowedSymbols = "?!.:;,[](){}|\"'/<>*+-@#$%&№^`~"
+    words = txt.lower()
+    for symbol in disallowedSymbols:
+        words = words.replace(symbol, '')
+    words = words.split()
     for word in words:
         if word in daysVariants:
             return True
@@ -24,7 +28,12 @@ def IsDateTimeInMessage(txt):
 
 
 def getDateByText(txt: str, now: datetime) -> datetime:
-    words = txt.lower().split()
+    disallowedSymbols = "?!.:;,[](){}|\"'/<>*+-@#$%&№^`~"
+    words = txt.lower()
+    for symbol in disallowedSymbols:
+        words = words.replace(symbol, '')
+    print("Words: " + words)
+    words=words.split()
 
     # Поиск дня недели в тексте (с учетом склонений)
     searchingDay = None
