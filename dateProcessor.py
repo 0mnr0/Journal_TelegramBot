@@ -17,6 +17,9 @@ days_map = {variant: day for day, variants in days_variants.items() for variant 
 
 def IsDateTimeInMessage(txt):
     disallowedSymbols = "?!.:;,[](){}|\"'/<>*+-@#$%&№^`~"
+    for symbol in disallowedSymbols:
+        txt = txt.replace(symbol, '')
+
     words = txt.lower()
     for symbol in disallowedSymbols:
         words = words.replace(symbol, '')
