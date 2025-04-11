@@ -1,3 +1,4 @@
+from ai import *
 import json
 import os
 import random
@@ -512,6 +513,7 @@ def printHelp(message):
 */cleanauthbyid* - Очистка авторизации группы по её ID
 */passnotify* - Убрать отправку расписания
 */exams* - Показать экзамены
+*/ai*, */помощьбедолагам* - Спросить ИИ (Использование - /ai <вопрос>)
 */notifyme* - Настроить ежедневную отправку расписания в формате часы:минуты
 */chatContext* - Указать, нужно ли боту отправлять расписание когда было упомянуто слово "пары" без команды
 */gmt* - Настройка сдвига времени для пользователя и для привязанных чатов
@@ -900,6 +902,19 @@ def isFirstApril():
 
 def ThreePercentChance():
     return random.randint(1, 100) <= 3
+
+
+@bot.message_handler(commands=['ai', 'помощьБедолагам', 'помощьбедолагам', 'ПомощьБедолагам', 'BastardHelp'])
+def aihelp(message):
+    try:
+        prompt = " ".join(message.text.split(" ")[1::])
+        bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('🤔')], is_big=False)
+        awnser = WalkingTowardsTheRiver.ThinkAbout(prompt)
+        awnser = telegramify_markdown.markdownify(awnser)
+        bot.reply_to(message, awnser, message_thread_id=isForum(message), parse_mode='MarkdownV2')
+    except Exception as e:
+        print(e)
+        bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('🤷')], is_big=False)
 
 
 @bot.message_handler(commands=['gmt'])
