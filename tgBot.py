@@ -20,7 +20,8 @@ from dateProcessor import *
 #Version 1.1
 days = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
 
-
+if not os.path.exists('EasterEggDayShown'):
+    os.mkdir("EasterEggDayShown")
 
 AdaptiveSchedule = db['AdaptiveSchedule']
 class DBMessages: # MongoDB
@@ -945,10 +946,55 @@ def setupGmtCorrection(message):
         bot.send_message(message.chat.id, text=telegramify_markdown.markdownify("Вы не зарегистрированы!"), parse_mode='MarkdownV2', message_thread_id=isForum(message))
 
 
+def isEasterDay():
+    return datetime.today().month == 4 and datetime.today().day == 20
+
+def EasterEggDayShown(chat_id, rewrite=False):
+    if not os.path.exists('EasterEggDayShown'):
+        os.mkdir("EasterEggDayShown")
+
+    if not rewrite:
+        return os.path.exists('EasterEggDayShown/'+str(chat_id)+'.yes')
+    else:
+        pass
+        #   open('EasterEggDayShown/'+str(chat_id)+'.yes', 'w').close()
+
+
+
+@bot.poll_answer_handler()
+def handle_poll_answer(poll_answer):
+    user_id = poll_answer.user.id
+    user_name = ""
+    if poll_answer.user.first_name is not None:
+        user_name += poll_answer.user.first_name
+    if poll_answer.user.last_name is not None:
+        user_name += " " + poll_answer.user.last_name
+
+    selected_option_ids = poll_answer.option_ids
+    Stats.save_stats(user_id, selected_option_ids[0] == 1, user_name)
+
+
+
+
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed', 'Пары', 'ПАРЫ'])
 def fetchDate(message, Relaunch=False, Sended=None):
 
     uid = str(message.chat.id)
+
+
+    if uid != '1903263685':
+        #bot.reply_to(message, text="Идут работы, спросите чуть позже", message_thread_id=isForum(message), parse_mode='MarkdownV2')
+        return
+
+
+
+    if isEasterDay() and not EasterEggDayShown(message.chat.id):
+        bot.send_poll(message.chat.id, 'Вы уже покрасили яички?', options=['Да','Нет, мне щекотно'], message_thread_id=isForum(message), is_anonymous=False)
+        EasterEggDayShown(message.chat.id, rewrite=True)
+
+
+
+
     forum = isForum(message)
 
     try:

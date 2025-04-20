@@ -54,3 +54,29 @@ def get_users_by_notification_time(time):
 def get_count_users_in_time(time):
     return collection.find({"time": time}).collection.count_documents({"time": time})
 
+
+
+#Create if not exsts
+mongoStat = client['EggHunters']
+if not mongoStat.list_collection_names():
+    mongoStat.create_collection("EasterEggDay")
+
+EasterCollection = mongoStat['EasterEggDay']
+class MStats:
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def get_stats(userId, ticklish):
+        return EasterCollection.find_one({"uid": userId, "ticklished": ticklish})
+
+    @staticmethod
+    def save_stats(userId, ticklish, user_name):
+        if Stats.get_stats(userId, ticklish) is None:
+            EasterCollection.insert_one({"uid": userId, "ticklished": ticklish, "name": user_name, "count": 1})
+        else:
+            EasterCollection.update_one({"uid": userId}, {"$inc": {"count": 1}})
+
+
+Stats = MStats()
+
