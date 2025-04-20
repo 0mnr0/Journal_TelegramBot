@@ -984,7 +984,8 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
     if uid != '1903263685':
         #bot.reply_to(message, text="Идут работы, спросите чуть позже", message_thread_id=isForum(message), parse_mode='MarkdownV2')
-        return
+        #return
+        pass
 
 
 
