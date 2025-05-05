@@ -1,9 +1,12 @@
+import math
+
 from ai import *
 import json
 import os
 import random
 import shutil
 import time
+from weather import *
 import calendar
 from datetime import datetime, timedelta
 from threading import *
@@ -87,6 +90,16 @@ def ReadBotJson(userId):
         pathToJson = userFolderPath + '/' + userId + '/botInfo.json'
         file = open(pathToJson, 'r', encoding='utf-8')
         return json.loads(file.read())
+    else:
+        return None
+
+
+def GetUserCity(userId):
+    if IsUserExists(userId):
+        userId = str(userId)
+        pathToJson = userFolderPath + '/' + userId + '/botInfo.json'
+        file = open(pathToJson, 'r', encoding='utf-8')
+        return json.loads(file.read()).get("cityName")
     else:
         return None
 
@@ -768,6 +781,34 @@ def get_keyboard():
     )
     return keyboard
 
+
+
+@bot.message_handler(commands=['setcity'])
+def setcity(message):
+    uid = str(message.chat.id)
+    print("uid:", uid)
+    forum = isForum(message)
+    if forum:
+        bot.reply_to(message, "Эту комманду можно выполнить только в личных сообщениях", message_thread_id=forum)
+        return
+    city = message.text.split(" ")
+    if len(city) != 2:
+        bot.reply_to(message, "Команда написана неправильно! Используйте /setcity Москва или /setcity Санкт-Петербург. Чтобы отключить погоду - используйте комманду /setcity off", message_thread_id=forum)
+        return
+    city = city[1]
+
+
+    botin = ReadJSON(uid + '/botInfo.json')
+    if city == "off" and botin.get("cityName") is not None:
+        botin.pop("cityName")
+    else:
+        botin['cityName'] = city
+    SaveJSON(uid+'/botInfo.json', botin)
+    if city != "off":
+        bot.reply_to(message, f"Вы указали город \"{city}\". Теперь погода будет показываться вместе с расписанием к привязанному городу. Отключить привязку к городу можно коммандой - /setcity off", message_thread_id=forum)
+    else:
+        bot.reply_to(message, "Вы отключили привязку к городу!", message_thread_id=forum)
+
 @bot.message_handler(commands=['dynamicmessage', 'DynamicMessage'])
 def DynamicMessage(message):
     uid = str(message.chat.id)
@@ -978,13 +1019,12 @@ def handle_poll_answer(poll_answer):
 
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed', 'Пары', 'ПАРЫ'])
 def fetchDate(message, Relaunch=False, Sended=None):
-
     uid = str(message.chat.id)
 
 
     if uid != '1903263685':
-        #bot.reply_to(message, text="Идут работы, спросите чуть позже", message_thread_id=isForum(message), parse_mode='MarkdownV2')
-        #return
+        bot.reply_to(message, text="Идут работы, спросите чуть позже", message_thread_id=isForum(message), parse_mode='MarkdownV2')
+        return
         pass
 
 
@@ -1205,6 +1245,26 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
                     except Exception as e:
                         print(e)
+
+
+                    UserCity = GetUserCity(uid)
+                    if UserCity != "off" and UserCity is not None:
+                        weatherData = WeatherAPI.OnDay(GetUserCity(uid), operationDay)
+                        weatherSymbols = ["☀️", "🌤️", "🌥️", "☁️"]
+                        weatherText = "Погода: \n"
+                        timenames = ["Утром", "Днём", "Вечером"]
+                        timeCodes =  ["morning", "day", "evening"]
+                        for i in range(len(timeCodes)):
+                            timeName = timenames[i]
+                            pickedTime = timeCodes[i]
+                            if type(weatherData.get(pickedTime)) == float:
+                                weatherText += f"{random.choice(weatherSymbols)} *{timeName}: {math.floor(weatherData.get(pickedTime))}° *\n"
+                        print(weatherData)
+
+                        try:
+                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText+weatherText, parse_mode='MarkdownV2')
+                        except Exception as e:
+                            raise e
 
 
 
@@ -1499,29 +1559,6 @@ def DynamicMessage(message):
         DynamicChatID, botin['DynamicChatID'] = 2 * [uid]
         DynamicForumID, botin['DynamicForumID'] = 2 * [forum]
         SaveJSON(uid+'botInfo.json', botin)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
