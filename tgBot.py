@@ -781,15 +781,17 @@ def get_keyboard():
     )
     return keyboard
 
+def IsUserAdmin(chat_id, user_id):
+    member = bot.get_chat_member(chat_id, user_id)
+    return member.status in ['administrator', 'creator']
 
 
 @bot.message_handler(commands=['setcity'])
 def setcity(message):
     uid = str(message.chat.id)
-    print("uid:", uid)
     forum = isForum(message)
-    if forum:
-        bot.reply_to(message, "Эту комманду можно выполнить только в личных сообщениях", message_thread_id=forum)
+    if forum and not IsUserAdmin(uid, message.from_user.id):
+        bot.reply_to(message, "Эту комманду может выполнить только администратора группы!", message_thread_id=forum)
         return
     city = message.text.split(" ")
     if len(city) != 2:
@@ -1023,8 +1025,8 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
 
     if uid != '1903263685':
-        bot.reply_to(message, text="Идут работы, спросите чуть позже", message_thread_id=isForum(message), parse_mode='MarkdownV2')
-        return
+        #bot.reply_to(message, text="Идут работы, спросите чуть позже", message_thread_id=isForum(message), parse_mode='MarkdownV2')
+        #return
         pass
 
 
@@ -1247,7 +1249,8 @@ def fetchDate(message, Relaunch=False, Sended=None):
                         print(e)
 
 
-                    UserCity = GetUserCity(uid)
+                    UserCity = GetUserCity(message.from_user.id)
+                    print("GetUserCity: ", UserCity)
                     if UserCity != "off" and UserCity is not None:
                         weatherData = WeatherAPI.OnDay(GetUserCity(uid), operationDay)
                         weatherSymbols = ["☀️", "🌤️", "🌥️", "☁️"]
