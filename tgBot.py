@@ -1250,7 +1250,6 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
 
                     UserCity = GetUserCity(message.from_user.id)
-                    print("GetUserCity: ", UserCity)
                     if UserCity != "off" and UserCity is not None:
                         weatherData = WeatherAPI.OnDay(GetUserCity(uid), operationDay)
                         weatherSymbols = ["☀️", "🌤️", "🌥️", "☁️"]
@@ -1262,7 +1261,6 @@ def fetchDate(message, Relaunch=False, Sended=None):
                             pickedTime = timeCodes[i]
                             if type(weatherData.get(pickedTime)) == float:
                                 weatherText += f"{random.choice(weatherSymbols)} *{timeName}: {math.floor(weatherData.get(pickedTime))}° *\n"
-                        print(weatherData)
 
                         try:
                             bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText+weatherText, parse_mode='MarkdownV2')
