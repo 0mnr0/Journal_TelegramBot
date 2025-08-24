@@ -1,24 +1,25 @@
-import math
-
-from ai import *
 import json
+import math
 import os
 import random
 import shutil
 import time
-from weather import *
-import calendar
-from datetime import datetime, timedelta
 from threading import *
 
 import requests
 import telebot
-import telegramify_markdown # 0.4.2 Supported only
+import telegramify_markdown  # 0.4.2 Supported only
 from telebot import types
 from telebot.types import ReactionTypeEmoji, InlineKeyboardButton, InlineKeyboardMarkup
 
+from ai import *
 from databases import *
 from dateProcessor import *
+from weather import *
+
+
+ALLOWED_USER_ON_MAINTAINCE = 1903263685
+IsMaintaince = False
 
 #Version 1.1
 days = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
@@ -51,6 +52,28 @@ class DBMessages: # MongoDB
 
 
 
+def get(url, authToken=None):
+    authToken = str(authToken)
+    headers = {
+        'origin': 'https://journal.top-academy.ru',
+        'Referer': 'https://journal.top-academy.ru',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+        'Authorization': 'Bearer ' + authToken
+    }
+    return requests.get(url, headers=headers)
+
+
+
+def post(url, js, authToken='null'):
+    headers = {
+        'Content-Type': 'application/json',
+        'Origin': 'https://journal.top-academy.ru',
+        'Referer': 'https://journal.top-academy.ru',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+        'Authorization': 'Bearer ' + authToken
+    }
+    js = dictToJson(js)
+    return requests.post(url, js, headers=headers)
 
 def isForum(message):
     forum = message.json['chat'].get("is_forum")
@@ -228,6 +251,8 @@ def cleanNotifyList(uid):
                 os.rmdir(userFolderPath+'/notifyList/'+time+'/'+userId)
                 send_message(uid, "*Notifier*: \nПостоянные уведомления отключены", disable_notification=True)
 
+
+
 lastTimeSended = None
 alreadyNotified = []
 maxLengthOfUsers = 0
@@ -274,6 +299,72 @@ def backgroundSend():
 notifier = Thread(target=backgroundSend)
 notifier.start()
 
+def EaseAuth(uid):
+    if IsUserRegistered(uid):
+        authData = {
+            "application_key": '6a56a5df2667e65aab73ce76d1dd737f7d1faef9c52e8b8c55ac75f565d8e8a6',
+            "username": ReadBotJson(uid).get('login'),
+            "password": ReadBotJson(uid).get('password'),
+        }
+        auth = post('https://msapi.top-academy.ru/api/v2/auth/login', authData)
+        if auth.status_code == 200:
+            responseJson = auth.json()
+            tkn = responseJson.get('access_token')
+            userInfo = ReadJSON(uid + '/botInfo.json')
+            userInfo['jwtToken'] = tkn
+            userInfo['jwtExpiries'] = responseJson.get('expires_in_access')
+            SaveJSON(uid + '/botInfo.json', userInfo)
+            return tkn
+        else:
+            return False
+    else:
+        return None
+
+def DateNotifier():
+    def CheckForChat(chatId):
+        daysToCheck = DayListener.GetDayListenerList(chatId)
+        for day in daysToCheck:
+            if day < datetime.now() + timedelta(days=1):
+                DayListener.RemoveDayListener(chatId, day)
+
+            else:
+                try:
+                    basicUrl = 'https://msapi.top-academy.ru/api/v2/schedule/operations/get-by-date?date_filter='+(day.strftime("%Y-%m-%d"))
+                    value = get(basicUrl, EaseAuth(chatId))
+                    if value.status_code == 200:
+                        jsonResult = value.json()
+                        if len(jsonResult) == 0:
+                            continue
+
+                        finalText = "Обнаружено расписание на " + day.strftime("%d.%m.%Y") + ":\n\n"
+                        for lesson in jsonResult:
+                            finalText += '>Пара ' + str(lesson.get('lesson')) + ':  ' + lesson.get('teacher_name') + '\n'
+                            finalText += '```\n' + lesson.get('subject_name') + "\n"
+                            finalText += lesson.get('started_at') + " - " + lesson.get('finished_at') + " (" + lesson.get(
+                                'room_name') + ")\n"
+                            finalText += "```\n"
+
+                        bot.send_message(chatId, text=telegramify_markdown.markdownify(finalText), parse_mode='MarkdownV2')
+                        DayListener.RemoveDayListener(chatId, day)
+                except Exception as e:
+                    bot.send_message(ALLOWED_USER_ON_MAINTAINCE, text=str(e), parse_mode='MarkdownV2')
+
+    ChatIDS = DayListener.GetChatIDList()
+    for chatId in ChatIDS:
+        CheckForChat(chatId)
+        time.sleep(1)
+
+def backgroundDateNotify():
+    while True:
+        try:
+            DateNotifier()
+        except Exception as e:
+            raise e
+
+        time.sleep(60 * 60)
+
+bgDateNotify = Thread(target=backgroundDateNotify)
+bgDateNotify.start()
 
 
 
@@ -554,26 +645,7 @@ def printHelp(message):
 
 
 
-def EaseAuth(uid):
-    if IsUserRegistered(uid):
-        authData = {
-            "application_key": '6a56a5df2667e65aab73ce76d1dd737f7d1faef9c52e8b8c55ac75f565d8e8a6',
-            "username": ReadBotJson(uid).get('login'),
-            "password": ReadBotJson(uid).get('password'),
-        }
-        auth = post('https://msapi.top-academy.ru/api/v2/auth/login', authData)
-        if auth.status_code == 200:
-            responseJson = auth.json()
-            tkn = responseJson.get('access_token')
-            userInfo = ReadJSON(uid + '/botInfo.json')
-            userInfo['jwtToken'] = tkn
-            userInfo['jwtExpiries'] = responseJson.get('expires_in_access')
-            SaveJSON(uid + '/botInfo.json', userInfo)
-            return tkn
-        else:
-            return False
-    else:
-        return None
+
 
 
 def ReAuthInSystem(message=None, uidNotMessage=None):
@@ -1321,30 +1393,84 @@ def globalCleaner(message):
             bot.reply_to(message, "Вы не можете использовать эту комманду в группах!")
 
 
+
+
+@bot.message_handler(commands=['daylistener'])
+def dayListener(message):
+    uid = str(message.chat.id)
+    msgText = message.text.replace("/daylistener ", "").split()
+    day = msgText[0]
+    # Parse day in format MM-DD
+
+    current_year = datetime.now().year
+    date_obj = datetime.strptime(f"{current_year}.{day}", "%Y.%m.%d")
+
+
+    UserTime = date_obj + timedelta(hours=getGmtCorrection(uid))
+    now = datetime.now()
+
+    if UserTime < now:
+        bot.reply_to(message, "Дата уже прошла!")
+        return
+
+    if DayListener.GetListenersCount(uid) >= 3:
+        bot.reply_to(message, "Вы достигли максимального количества дневных слушателей!")
+        return
+
+    if DayListener.IsDayExists(uid, date_obj):
+        bot.reply_to(message, "Данный день уже в списке прослушиваемых дней!")
+        return
+
+    DayListener.AddDayListener(uid, date_obj)
+    okText = "Информация об этом дне поступит в течении 30 минут после появления расписания! (Beta) Ваш список прослушиваемых дней: \n"
+    for day in DayListener.GetDayListenerList(uid):
+        okText += "> " + day.strftime("%Y.%m.%d") +"\n"
+    bot.reply_to(message, telegramify_markdown.markdownify(okText, max_line_length=None, normalize_whitespace=False), parse_mode='MarkdownV2')
+
+
+@bot.message_handler(commands=['mydaylisteners'])
+def myDayListeners(message):
+    uid = str(message.chat.id)
+    okText = "Ваш список прослушиваемых дней: \n"
+    for day in DayListener.GetDayListenerList(uid):
+        okText += "> " + day.strftime("%Y.%m.%d") +"\n"
+    if len(DayListener.GetDayListenerList(uid)) == 0:
+        okText += "Пуст!"
+    bot.reply_to(message, telegramify_markdown.markdownify(okText, max_line_length=None, normalize_whitespace=False), parse_mode='MarkdownV2')
+
+
+@bot.message_handler(commands=['removedaylisteners'])
+def removeDayListeners(message):
+    uid = str(message.chat.id)
+    for day in DayListener.GetDayListenerList(uid):
+        DayListener.RemoveDayListener(uid, day)
+    bot.reply_to(message, "Ваш список прослушиваемых дней очищен!")
+
+
 @bot.message_handler(commands=['cleanauthbyid'])
 def cleanerById(message):
     uid = str(message.chat.id)
     if not isMessageFromGroup(message):
-        if os.path.exists(userFolderPath + '/' + uid):
+        if os.path.exists(f'{userFolderPath}/{uid}'):
             keys = message.text.split(" ")
             if len(keys) == 2:
                 groupid = keys[1]
-                if os.path.exists(userFolderPath + '/' + groupid):
-                    userConnectedGroups = ReadFile(uid+'/list.inf').split("\n")
+                if os.path.exists(f'{userFolderPath}/{groupid}'):
+                    userConnectedGroups = ReadFile(f'{uid}/list.inf').split("\n")
 
                     if groupid in userConnectedGroups and type(groupid) == str:
                         try:
                             groupInt = int(groupid)
                             userConnectedGroups.remove(groupid)
-                            SaveFileByList(uid+'/list.inf', userConnectedGroups)
+                            SaveFileByList(f'{uid}/list.inf', userConnectedGroups)
 
-                            groupBotData = ReadJSON(groupid+'/botInfo.json')
+                            groupBotData = ReadJSON(f'{groupid}/botInfo.json')
                             groupBotData['login'] = None
                             groupBotData['password'] = None
                             groupBotData['jwtToken'] = None
                             groupBotData['jwtExpiries'] = None
-                            SaveJSON(groupid+'/botInfo.json', groupBotData)
-                            send_message(uid, "Авторизация для группы *"+groupid+"* очищена.")
+                            SaveJSON(f'{groupid}/botInfo.json', groupBotData)
+                            send_message(uid, f"Авторизация для группы *{groupid}* очищена.")
                             send_message(groupInt, "Данные авторизации для этой группы больше не активны. Невозможно запрашивать данные. Пройдите авторизацию с помощью /auth")
 
                         except Exception as e:
@@ -1419,27 +1545,7 @@ def stateGroupAuth(call):
     #makeAuth(chat_id, True)
 
 
-def get(url, authToken=None):
-    authToken = str(authToken)
-    headers = {
-        'origin': 'https://journal.top-academy.ru',
-        'Referer': 'https://journal.top-academy.ru',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
-        'Authorization': 'Bearer ' + authToken
-    }
-    return requests.get(url, headers=headers)
 
-
-def post(url, js, authToken='null'):
-    headers = {
-        'Content-Type': 'application/json',
-        'Origin': 'https://journal.top-academy.ru',
-        'Referer': 'https://journal.top-academy.ru',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
-        'Authorization': 'Bearer ' + authToken
-    }
-    js = dictToJson(js)
-    return requests.post(url, js, headers=headers)
 
 
 @bot.message_handler(func=lambda message: True)
@@ -1560,6 +1666,9 @@ def DynamicMessage(message):
         DynamicChatID, botin['DynamicChatID'] = 2 * [uid]
         DynamicForumID, botin['DynamicForumID'] = 2 * [forum]
         SaveJSON(uid+'botInfo.json', botin)
+
+
+
 
 
 

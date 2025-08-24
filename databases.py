@@ -80,3 +80,79 @@ class MStats:
 
 Stats = MStats()
 
+
+
+
+if "DayListener" not in db.list_collection_names():
+    db.create_collection("DayListener")
+
+dayListenBase = db["DayListener"]
+
+class DayListener:
+    @staticmethod
+    def AddDayListener(chatId, day):
+        if not DayListener.isChatExists(chatId):
+            dayListenBase.insert_one({"chatId": chatId, "days": [day]})
+        else:
+            dayListenBase.update_one({"chatId": chatId}, {"$push": {"days": day}})
+        
+    
+    @staticmethod
+    def GetDayListenerList(chatId):
+        if not DayListener.isChatExists(chatId):
+            return []
+
+        retValue = dayListenBase.find_one({"chatId": chatId})
+        if retValue is None:
+            return []
+        retValue = retValue.get("days")
+        return [] if retValue is None else retValue
+    
+    @staticmethod
+    def isChatExists(chatId):
+        return dayListenBase.find_one({"chatId": chatId}) is not None
+
+    @staticmethod
+    def RemoveDayListener(chatId, day):
+        dayListenBase.update_one({"chatId": chatId}, {"$pull": {"days": day}})
+        
+        
+    @staticmethod
+    def GetListenersCount(chatId):
+        if not DayListener.isChatExists(chatId):
+            return 0
+        retValue = dayListenBase.find_one({"chatId": chatId})
+        if retValue is None:
+            return 0
+        retValue = retValue.get("days")
+        return 0 if retValue is None else len(retValue)
+
+    @staticmethod
+    def IsDayExists(chatId, day):
+        if not DayListener.isChatExists(chatId):
+            return False
+        return day in DayListener.GetDayListenerList(chatId)
+
+    @staticmethod
+    def GetListByChatId(chatId):
+        if not DayListener.isChatExists(chatId):
+            return []
+        return dayListenBase.find_one({"chatId": chatId})
+
+
+    @staticmethod
+    def GetChatIDList():
+        return dayListenBase.distinct("chatId")
+    
+    @staticmethod
+    def GetThreadID(chatId):
+        if not DayListener.isChatExists(chatId):
+            return False
+        return dayListenBase.find_one({"chatId": chatId}).get("threadId")
+
+    @staticmethod
+    def SetThreadID(chatId, threadId):
+        if not DayListener.isChatExists(chatId):
+            return False
+        dayListenBase.update_one({"chatId": chatId}, {"$set": {"threadId": threadId}})
+        return None
