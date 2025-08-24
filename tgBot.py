@@ -1403,7 +1403,10 @@ def dayListener(message):
     # Parse day in format MM-DD
 
     current_year = datetime.now().year
-    date_obj = datetime.strptime(f"{current_year}.{day}", "%Y.%m.%d")
+    try: date_obj = datetime.strptime(f"{current_year}.{day}", "%Y.%m.%d")
+    except:
+        bot.reply_to(message, telegramify_markdown.markdownify("Дата указано в неправильном формате! Используйте формат `MM.DD`"), parse_mode='MarkdownV2')
+        return
 
 
     UserTime = date_obj + timedelta(hours=getGmtCorrection(uid))
