@@ -1425,7 +1425,7 @@ def dayListener(message):
     okText = "Информация об этом дне поступит в течении 30 минут после появления расписания! (Beta) Ваш список прослушиваемых дней: \n"
     for day in DayListener.GetDayListenerList(uid):
         okText += "> " + day.strftime("%Y.%m.%d") +"\n"
-    bot.reply_to(message, telegramify_markdown.markdownify(okText, max_line_length=None, normalize_whitespace=False), parse_mode='MarkdownV2')
+    bot.reply_to(message, telegramify_markdown.markdownify(okText, max_line_length=None, normalize_whitespace=False), parse_mode='MarkdownV2', disable_notification=True)
 
 
 @bot.message_handler(commands=['mydaylisteners'])
