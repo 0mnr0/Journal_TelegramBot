@@ -1405,7 +1405,7 @@ def dayListener(message):
     current_year = datetime.now().year
     try: date_obj = datetime.strptime(f"{current_year}.{day}", "%Y.%m.%d")
     except:
-        bot.reply_to(message, telegramify_markdown.markdownify("Дата указано в неправильном формате! Используйте формат `MM.DD`"), parse_mode='MarkdownV2')
+        bot.reply_to(message, telegramify_markdown.markdownify("Дата указана в неправильном формате! Используйте формат `MM.DD`"), parse_mode='MarkdownV2')
         return
 
 
