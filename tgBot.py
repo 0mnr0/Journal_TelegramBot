@@ -336,7 +336,7 @@ def DateNotifier():
                         if len(jsonResult) == 0:
                             continue
 
-                        finalText = "Обнаружено расписание на " + day.strftime("%d.%m.%Y") + ":\n\n"
+                        finalText = "Произошли изменения на дату " + day.strftime("%d.%m.%Y") + ":\n\n"
                         for lesson in jsonResult:
                             finalText += '>Пара ' + str(lesson.get('lesson')) + ':  ' + lesson.get('teacher_name') + '\n'
                             finalText += '```\n' + lesson.get('subject_name') + "\n"
