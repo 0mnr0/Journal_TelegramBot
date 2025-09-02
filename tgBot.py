@@ -16,6 +16,7 @@ from ai import *
 from databases import *
 from dateProcessor import *
 from weather import *
+import ContextDetection
 
 
 ALLOWED_USER_ON_MAINTAINCE = 1903263685
@@ -1092,7 +1093,7 @@ def handle_poll_answer(poll_answer):
 
 
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed', 'Пары', 'ПАРЫ'])
-def fetchDate(message, Relaunch=False, Sended=None):
+def fetchDate(message, Relaunch=False, Sended=None, accuracy=None):
     uid = str(message.chat.id)
 
 
@@ -1259,6 +1260,10 @@ def fetchDate(message, Relaunch=False, Sended=None):
                     if len(finalText) > 0 and FixedByCycle:
                         finalText += f"\n\n*Успешно выполнен патч исправления пустого расписания (LuckyTry: {str(Tries)} / 5)*"
 
+
+                    if type(accuracy) == float:
+                        finalText += f"\n```[AI] Detection Accuracy -> {str(accuracy*100)[:5]}%```"
+
                     if sended_msg is not None:
                         try:
                             bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text="Пары на *" + showingText + "*:\n\n" +finalText, parse_mode='MarkdownV2')
@@ -1271,16 +1276,12 @@ def fetchDate(message, Relaunch=False, Sended=None):
 
                     finalText = "Пары на *" + showingText + "*:\n\n" + finalText
 
-                    if finalText.count("Миненко Алексей Павлович") > 2:   # P.S. Это наш легендарный учитель, не буду врать
-                        finalText += "\n 🔥 Имба, NGL!"
-
                     converted = telegramify_markdown.markdownify(
                         finalText,
                         max_line_length=None,
                         normalize_whitespace=False
                     )
 
-                    newMsg = None
                     try:
                         bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=converted, parse_mode='MarkdownV2')
                     except:
@@ -1650,8 +1651,22 @@ def echo_message(message):
 
     elif IsUserRegistered(uid) and not ui.get('WaitForAuth'):
         if True:
-            if '!пары' in message.text.lower() or '!gfhs' in message.text.lower() or '!расписание' in message.text.lower() or (GetUseTextContext(message.chat.id) and 'пары' in message.text.lower()):
+            if '!пары' in message.text.lower() or '!gfhs' in message.text.lower() or '!расписание' in message.text.lower():
                 fetchDate(message)
+            if GetUseTextContext(message.chat.id) and 'пар' in message.text.lower():
+                shouldBeExecuted, displayPercent = ContextDetection.GetCommandWeight(message.text)
+                if shouldBeExecuted:
+                    fetchDate(message, accuracy=displayPercent)
+                else:
+                    bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('☃')],
+                                             is_big=False)
+                    if not os.path.exists('notTriggeredTexts.txt'):
+                        open('notTriggeredTexts.txt', 'w+').close()
+
+                    file = open('notTriggeredTexts.txt', 'a+', encoding="utf-8")
+                    file.write(f'"{message.text.lower()}"  >>>  {round(displayPercent, 3)}\n')
+                    file.close()
+
 
 
 @bot.message_handler(commands=['dynamicmessage'])
