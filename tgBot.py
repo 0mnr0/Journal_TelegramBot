@@ -1093,7 +1093,7 @@ def handle_poll_answer(poll_answer):
 
 
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed', 'Пары', 'ПАРЫ'])
-def fetchDate(message, Relaunch=False, Sended=None, accuracy=None):
+def fetchDate(message, Relaunch=False, Sended=None, accuracy=None, accuracyText=None):
     uid = str(message.chat.id)
 
 
@@ -1262,7 +1262,7 @@ def fetchDate(message, Relaunch=False, Sended=None, accuracy=None):
 
 
                     if type(accuracy) == float:
-                        finalText += f"\n```[AI] Detection Accuracy -> {str(accuracy*100)[:5]}%```"
+                        finalText += f"\nAI Accuracy: `{str(accuracy*100)[:5]}%`"
 
                     if sended_msg is not None:
                         try:
@@ -1282,10 +1282,19 @@ def fetchDate(message, Relaunch=False, Sended=None, accuracy=None):
                         normalize_whitespace=False
                     )
 
+                    AITriggerkeyBoard = types.InlineKeyboardMarkup()
+                    if type(accuracy) == float:
+                        BADTriggered = types.InlineKeyboardButton("[DEV] 📖 Отметить неправильный триггер ИИ",
+                                                                  callback_data=f"aitriggercallback:bad:{accuracyText}:{accuracy}")
+                        AITriggerkeyBoard.add(BADTriggered)
+
+
                     try:
-                        bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=converted, parse_mode='MarkdownV2')
+                        bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=converted, parse_mode='MarkdownV2', reply_markup=AITriggerkeyBoard)
                     except:
-                        sended_msg = bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum)
+
+                        sended_msg = bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum, reply_markup=AITriggerkeyBoard)
+
 
                     userExams = get('https://msapi.top-academy.ru/api/v2/dashboard/info/future-exams', lastJwt)
                     if fetchResult.status_code == 200:
@@ -1314,7 +1323,7 @@ def fetchDate(message, Relaunch=False, Sended=None, accuracy=None):
                         )
 
                         try:
-                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText, parse_mode='MarkdownV2')
+                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText, parse_mode='MarkdownV2', reply_markup=AITriggerkeyBoard)
                         except Exception as e:
                             raise e
 
@@ -1336,7 +1345,7 @@ def fetchDate(message, Relaunch=False, Sended=None, accuracy=None):
                                 weatherText += f"{random.choice(weatherSymbols)} *{timeName}: {math.floor(weatherData.get(pickedTime))}° *\n"
 
                         try:
-                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText+weatherText, parse_mode='MarkdownV2')
+                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText+weatherText, parse_mode='MarkdownV2', reply_markup=AITriggerkeyBoard)
                         except Exception as e:
                             raise e
 
@@ -1656,7 +1665,7 @@ def echo_message(message):
             if GetUseTextContext(message.chat.id) and 'пар' in message.text.lower():
                 shouldBeExecuted, displayPercent = ContextDetection.GetCommandWeight(message.text)
                 if shouldBeExecuted:
-                    fetchDate(message, accuracy=displayPercent)
+                    fetchDate(message, accuracy=displayPercent, accuracyText = message.text)
                 else:
                     bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('☃')],
                                              is_big=False)
@@ -1696,6 +1705,22 @@ def callback_ok(call):
     bot.answer_callback_query(callback_query_id=call.id, text="Пример текста", show_alert=True)
 
 
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("aitriggercallback"))
+def aitriggercallback(call):
+    isGoodPrediction = (call.data.split(":")[1]) == "ok"
+    triggerText = open('goodTriggeredTexts' if isGoodPrediction else 'badTriggeredTexts' + '.txt', 'a+', encoding="utf-8")
+
+    bot.answer_callback_query(call.id)
+    print()
+    if triggerText.read().index(call.data.split(":")[2]) != -1:
+        triggerText.close()
+        return
+    triggerText.write(f'"{call.data.split(":")[2]}" >>>  {call.data.split(":")[3]}\n')
+    triggerText.close()
+
+
+
 def send_message(userId, msg, reply_markup=None, disable_notification=False, message_thread_id=None):
     converted = telegramify_markdown.markdownify(
         msg,
@@ -1704,7 +1729,6 @@ def send_message(userId, msg, reply_markup=None, disable_notification=False, mes
 
     )
     return bot.send_message(userId, converted, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification, message_thread_id=message_thread_id)
-
 
 
 while True:
