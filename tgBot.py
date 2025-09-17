@@ -1281,19 +1281,10 @@ def fetchDate(message, Relaunch=False, Sended=None, accuracy=None, accuracyText=
                         max_line_length=None,
                         normalize_whitespace=False
                     )
-
-                    AITriggerkeyBoard = types.InlineKeyboardMarkup()
-                    if type(accuracy) == float:
-                        BADTriggered = types.InlineKeyboardButton("[DEV] 📖 Отметить неправильный триггер ИИ",
-                                                                  callback_data=f"aitriggercallback:bad:{accuracyText}:{accuracy}")
-                        AITriggerkeyBoard.add(BADTriggered)
-
-
                     try:
-                        bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=converted, parse_mode='MarkdownV2', reply_markup=AITriggerkeyBoard)
+                        bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=converted, parse_mode='MarkdownV2')
                     except:
-
-                        sended_msg = bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum, reply_markup=AITriggerkeyBoard)
+                        sended_msg = bot.send_message(message.chat.id, text=converted, parse_mode='MarkdownV2', message_thread_id=forum)
 
 
                     userExams = get('https://msapi.top-academy.ru/api/v2/dashboard/info/future-exams', lastJwt)
@@ -1323,7 +1314,7 @@ def fetchDate(message, Relaunch=False, Sended=None, accuracy=None, accuracyText=
                         )
 
                         try:
-                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText, parse_mode='MarkdownV2', reply_markup=AITriggerkeyBoard)
+                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText, parse_mode='MarkdownV2')
                         except Exception as e:
                             raise e
 
@@ -1345,7 +1336,7 @@ def fetchDate(message, Relaunch=False, Sended=None, accuracy=None, accuracyText=
                                 weatherText += f"{random.choice(weatherSymbols)} *{timeName}: {math.floor(weatherData.get(pickedTime))}° *\n"
 
                         try:
-                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText+weatherText, parse_mode='MarkdownV2', reply_markup=AITriggerkeyBoard)
+                            bot.edit_message_text(chat_id=message.chat.id, message_id=sended_msg.message_id, text=examText+weatherText, parse_mode='MarkdownV2')
                         except Exception as e:
                             raise e
 
@@ -1703,21 +1694,6 @@ def DynamicMessage(message):
 def callback_ok(call):
     # Показываем попап с текстом при нажатии на кнопку
     bot.answer_callback_query(callback_query_id=call.id, text="Пример текста", show_alert=True)
-
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("aitriggercallback"))
-def aitriggercallback(call):
-    isGoodPrediction = (call.data.split(":")[1]) == "ok"
-    triggerText = open('goodTriggeredTexts' if isGoodPrediction else 'badTriggeredTexts' + '.txt', 'a+', encoding="utf-8")
-
-    bot.answer_callback_query(call.id)
-    print()
-    if triggerText.read().index(call.data.split(":")[2]) != -1:
-        triggerText.close()
-        return
-    triggerText.write(f'"{call.data.split(":")[2]}" >>>  {call.data.split(":")[3]}\n')
-    triggerText.close()
 
 
 
