@@ -1093,7 +1093,7 @@ def handle_poll_answer(poll_answer):
 
 
 @bot.message_handler(commands=['пары', 'расписание', 'sched', 'shed', 'Пары', 'ПАРЫ'])
-def fetchDate(message, Relaunch=False, Sended=None, accuracy=None, accuracyText=None):
+def fetchDate(message, Relaunch=False, Sended=None):
     uid = str(message.chat.id)
 
 
@@ -1260,9 +1260,6 @@ def fetchDate(message, Relaunch=False, Sended=None, accuracy=None, accuracyText=
                     if len(finalText) > 0 and FixedByCycle:
                         finalText += f"\n\n*Успешно выполнен патч исправления пустого расписания (LuckyTry: {str(Tries)} / 5)*"
 
-
-                    if type(accuracy) == float:
-                        finalText += f"\nAI Accuracy: `{str(accuracy*100)[:5]}%`"
 
                     if sended_msg is not None:
                         try:
@@ -1656,7 +1653,7 @@ def echo_message(message):
             if GetUseTextContext(message.chat.id) and 'пар' in message.text.lower():
                 shouldBeExecuted, displayPercent = ContextDetection.GetCommandWeight(message.text)
                 if shouldBeExecuted:
-                    fetchDate(message, accuracy=displayPercent, accuracyText = message.text)
+                    fetchDate(message)
                 else:
                     bot.set_message_reaction(message.chat.id, message.id, [ReactionTypeEmoji('☃')],
                                              is_big=False)
