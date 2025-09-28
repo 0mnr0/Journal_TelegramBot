@@ -1707,6 +1707,7 @@ def send_message(userId, msg, reply_markup=None, disable_notification=False, mes
     return bot.send_message(userId, converted, parse_mode='MarkdownV2', reply_markup=reply_markup, disable_notification = disable_notification, message_thread_id=message_thread_id)
 
 
+print("Bot is running...")
 while True:
     try:
         bot.infinity_polling()

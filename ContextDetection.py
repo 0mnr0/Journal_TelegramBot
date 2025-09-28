@@ -55,6 +55,8 @@ class Sample:
 base_samples: List[Sample] = [
     # Ваши примеры
     Sample("пары завтра", 1),
+    Sample("пары завтра", 1),
+    Sample("пары завтра", 1),
     Sample("Какие затра пары?", 1),
     Sample("Расписание завтра", 1),
     Sample("Ну хорошо: вечером приду на пары", 0),
@@ -62,8 +64,12 @@ base_samples: List[Sample] = [
     Sample("Не хочу завтра на пары", 0),
     Sample("Я завтра приду на пары", 0),
     Sample("что у нас завтра по парам?", 1),
+    Sample("пары послезавтра", 1),
     Sample("Есть ли на завтра расписание по парам?", 1),
     Sample("Сегодня вообще нет пар", 0),
+    Sample("пары после завтра", 1),
+    Sample("какие пары на завтра", 1),
+    Sample("пары на завтра", 1),
     Sample("Не буду сегодня на парах", 0),
     Sample("Сколько пар у меня завтра?", 1),
     Sample("Я не знаю: есть ли у меня пары", 1),
@@ -75,6 +81,9 @@ base_samples: List[Sample] = [
     Sample("У меня завтра пара по математике?", 1),
     Sample("Завтра не будет пар?", 1),
     Sample("пары в понедельник", 1),
+    Sample("пары 10.10", 1),
+    Sample("пары на 10.10", 1),
+    Sample("пары в 10.10", 1),
     Sample("пары во втроник", 1),
     Sample("пары в среду", 1), Sample("пары среда", 1),
     Sample("пары в четверг", 1),
@@ -124,7 +133,7 @@ base_samples: List[Sample] = [
     Sample("я спросил, пар не будет", 0),
     Sample("сказали на пары не идти", 0),
     Sample("пар не будет", 0),
-    Sample("нет пар завтра", 0),
+    Sample("у нас нет пар завтра", 0),
     Sample("завтра пар нет", 0),
     Sample("я на пары не приду", 0),
     Sample("ничего про пары", 0),
@@ -225,11 +234,9 @@ def train_and_save():
 
     y_pred = clf.predict(X_val)
     acc = accuracy_score(y_val, y_pred)
-    print(f"Validation accuracy: {acc:.3f}")
     print(classification_report(y_val, y_pred, digits=3))
 
     dump(clf, MODEL_PATH)
-    print(f"Model saved to: {MODEL_PATH}")
 
 # --------------------------
 # Инференс

@@ -5,3 +5,5 @@ tkn.ini
 /__pycache__
 ffmpeg.exe
 router.ai
+/notTriggeredTexts.txt
+/weather.key
